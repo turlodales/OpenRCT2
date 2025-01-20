@@ -1,5 +1,5 @@
 /*****************************************************************************
- * Copyright (c) 2014-2023 OpenRCT2 developers
+ * Copyright (c) 2014-2025 OpenRCT2 developers
  *
  * For a complete list of all authors, please refer to contributors.md
  * Interested in contributing? Visit https://github.com/OpenRCT2/OpenRCT2
@@ -9,32 +9,35 @@
 
 #if defined(__unix__) && !defined(__ANDROID__) && !defined(__APPLE__)
 
-#    include <cstring>
-#    include <fnmatch.h>
-#    include <limits.h>
-#    include <locale.h>
-#    include <pwd.h>
-#    include <vector>
-#    if defined(__FreeBSD__) || defined(__NetBSD__)
-#        include <stddef.h>
-#        include <sys/param.h>
-#        include <sys/sysctl.h>
-#    endif // __FreeBSD__ || __NetBSD__
-#    if defined(__linux__)
-// for PATH_MAX
-#        include <linux/limits.h>
-#    endif // __linux__
-#    ifndef NO_TTF
-#        include <fontconfig/fontconfig.h>
-#    endif // NO_TTF
+    #include "../Diagnostic.h"
 
-#    include "../Date.h"
-#    include "../OpenRCT2.h"
-#    include "../core/Path.hpp"
-#    include "../localisation/Language.h"
-#    include "Platform.h"
+    #include <cstring>
+    #include <fnmatch.h>
+    #include <limits.h>
+    #include <locale.h>
+    #include <pwd.h>
+    #include <unistd.h>
+    #include <vector>
+    #if defined(__FreeBSD__) || defined(__NetBSD__)
+        #include <stddef.h>
+        #include <sys/param.h>
+        #include <sys/sysctl.h>
+    #endif // __FreeBSD__ || __NetBSD__
+    #if defined(__linux__)
+        // for PATH_MAX
+        #include <linux/limits.h>
+    #endif // __linux__
+    #ifndef NO_TTF
+        #include <fontconfig/fontconfig.h>
+    #endif // NO_TTF
 
-namespace Platform
+    #include "../Date.h"
+    #include "../OpenRCT2.h"
+    #include "../core/Path.hpp"
+    #include "../localisation/Language.h"
+    #include "Platform.h"
+
+namespace OpenRCT2::Platform
 {
     std::string GetFolderPath(SPECIAL_FOLDER folder)
     {
@@ -96,25 +99,23 @@ namespace Platform
         }
         // 2. Try {${exeDir},${cwd},/}/{data,standard system app directories}
         // exeDir should come first to allow installing into build dir
-        std::vector<std::string> prefixes;
-        auto exePath = Platform::GetCurrentExecutablePath();
-        prefixes.push_back(Path::GetDirectory(exePath));
-        prefixes.push_back(GetCurrentWorkingDirectory());
-        prefixes.push_back("/");
-        static const char* SearchLocations[] = {
+        // clang-format off
+        const std::string prefixes[]{
+            Path::GetDirectory(Platform::GetCurrentExecutablePath()),
+            GetCurrentWorkingDirectory(),
+            "/"
+        };
+        static constexpr u8string_view SearchLocations[] = {
             "/data",
             "../share/openrct2",
-#    ifdef ORCT2_RESOURCE_DIR
-            // defined in CMakeLists.txt
-            ORCT2_RESOURCE_DIR,
-#    endif // ORCT2_RESOURCE_DIR
             "/usr/local/share/openrct2",
             "/var/lib/openrct2",
             "/usr/share/openrct2",
         };
+        // clang-format on
         for (const auto& prefix : prefixes)
         {
-            for (auto searchLocation : SearchLocations)
+            for (const auto searchLocation : SearchLocations)
             {
                 auto prefixedPath = Path::Combine(prefix, searchLocation);
                 LOG_VERBOSE("Looking for OpenRCT2 data in %s", prefixedPath.c_str());
@@ -130,40 +131,40 @@ namespace Platform
     std::string GetCurrentExecutablePath()
     {
         char exePath[PATH_MAX] = { 0 };
-#    ifdef __linux__
+    #ifdef __linux__
         auto bytesRead = readlink("/proc/self/exe", exePath, sizeof(exePath));
         if (bytesRead == -1)
         {
             LOG_FATAL("failed to read /proc/self/exe");
         }
-#    elif defined(__FreeBSD__) || defined(__NetBSD__)
-#        if defined(__FreeBSD__)
+    #elif defined(__FreeBSD__) || defined(__NetBSD__)
+        #if defined(__FreeBSD__)
         const int32_t mib[] = {
             CTL_KERN,
             KERN_PROC,
             KERN_PROC_PATHNAME,
             -1,
         };
-#        else
+        #else
         const int32_t mib[] = {
             CTL_KERN,
             KERN_PROC_ARGS,
             -1,
             KERN_PROC_PATHNAME,
         };
-#        endif
+        #endif
         auto exeLen = sizeof(exePath);
         if (sysctl(mib, 4, exePath, &exeLen, nullptr, 0) == -1)
         {
             LOG_FATAL("failed to get process path");
         }
-#    elif defined(__OpenBSD__)
+    #elif defined(__OpenBSD__)
         // There is no way to get the path name of a running executable.
         // If you are not using the port or package, you may have to change this line!
         strlcpy(exePath, "/usr/local/bin/", sizeof(exePath));
-#    else
-#        error "Platform does not support full path exe retrieval"
-#    endif
+    #else
+        #error "Platform does not support full path exe retrieval"
+    #endif
         return exePath;
     }
 
@@ -198,7 +199,7 @@ namespace Platform
                         break;
                     }
                 }
-            }                                         // end strip
+            } // end strip
             std::memcpy(pattern, langString, length); // copy all until first '.' or '@'
             pattern[length] = '\0';
             // find _ if present
@@ -258,12 +259,12 @@ namespace Platform
 
     MeasurementFormat GetLocaleMeasurementFormat()
     {
-// LC_MEASUREMENT is GNU specific.
-#    ifdef LC_MEASUREMENT
+    // LC_MEASUREMENT is GNU specific.
+    #ifdef LC_MEASUREMENT
         const char* langstring = setlocale(LC_MEASUREMENT, "");
-#    else
+    #else
         const char* langstring = setlocale(LC_ALL, "");
-#    endif
+    #endif
 
         if (langstring != nullptr)
         {
@@ -300,7 +301,15 @@ namespace Platform
             return {};
         }
 
-        auto steamPath = Path::Combine(homeDir, u8".local/share/Steam/ubuntu12_32/steamapps/content");
+        // Prefer new path for Steam, which is the default when using with Proton
+        auto steamPath = Path::Combine(homeDir, u8".local/share/Steam/steamapps/common");
+        if (Path::DirectoryExists(steamPath))
+        {
+            return steamPath;
+        }
+
+        // Fallback paths
+        steamPath = Path::Combine(homeDir, u8".local/share/Steam/ubuntu12_32/steamapps/content");
         if (Path::DirectoryExists(steamPath))
         {
             return steamPath;
@@ -311,11 +320,36 @@ namespace Platform
         {
             return steamPath;
         }
-
         return {};
     }
 
-#    ifndef NO_TTF
+    u8string GetRCT1SteamDir()
+    {
+        return u8"Rollercoaster Tycoon Deluxe";
+    }
+
+    u8string GetRCT2SteamDir()
+    {
+        return u8"Rollercoaster Tycoon 2";
+    }
+
+    std::vector<std::string_view> GetSearchablePathsRCT1()
+    {
+        return {
+            // game-data-packager uses this path when installing game files
+            "/usr/share/games/roller-coaster-tycoon",
+        };
+    }
+
+    std::vector<std::string_view> GetSearchablePathsRCT2()
+    {
+        return {
+            // game-data-packager uses this path when installing game files
+            "/usr/share/games/roller-coaster-tycoon2",
+        };
+    }
+
+    #ifndef NO_TTF
     std::string GetFontPath(const TTFFontDescriptor& font)
     {
         LOG_VERBOSE("Looking for font %s with FontConfig.", font.font_name);
@@ -372,7 +406,7 @@ namespace Platform
         FcFini();
         return path;
     }
-#    endif // NO_TTF
-} // namespace Platform
+    #endif // NO_TTF
+} // namespace OpenRCT2::Platform
 
 #endif

@@ -1,5 +1,5 @@
 /*****************************************************************************
- * Copyright (c) 2014-2023 OpenRCT2 developers
+ * Copyright (c) 2014-2025 OpenRCT2 developers
  *
  * For a complete list of all authors, please refer to contributors.md
  * Interested in contributing? Visit https://github.com/OpenRCT2/OpenRCT2
@@ -9,11 +9,11 @@
 
 #ifndef DISABLE_NETWORK
 
-#    include "NetworkPlayer.h"
+    #include "NetworkPlayer.h"
 
-#    include "../interface/Window.h"
-#    include "../localisation/Localisation.h"
-#    include "NetworkPacket.h"
+    #include "../core/Money.hpp"
+    #include "../interface/Window.h"
+    #include "NetworkPacket.h"
 
 void NetworkPlayer::SetName(std::string_view name)
 {
@@ -36,11 +36,16 @@ void NetworkPlayer::Write(NetworkPacket& packet)
            << CommandsRan;
 }
 
+void NetworkPlayer::IncrementNumCommands()
+{
+    CommandsRan++;
+    OpenRCT2::WindowInvalidateByNumber(WindowClass::Player, Id);
+}
+
 void NetworkPlayer::AddMoneySpent(money64 cost)
 {
     MoneySpent += cost;
-    CommandsRan++;
-    WindowInvalidateByNumber(WindowClass::Player, Id);
+    OpenRCT2::WindowInvalidateByNumber(WindowClass::Player, Id);
 }
 
 #endif

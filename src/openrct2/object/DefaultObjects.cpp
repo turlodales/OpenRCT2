@@ -1,5 +1,5 @@
 /*****************************************************************************
- * Copyright (c) 2014-2023 OpenRCT2 developers
+ * Copyright (c) 2014-2025 OpenRCT2 developers
  *
  * For a complete list of all authors, please refer to contributors.md
  * Interested in contributing? Visit https://github.com/OpenRCT2/OpenRCT2
@@ -113,6 +113,17 @@ const std::string_view DefaultSelectedObjects[] = {
     "rct2.music.pirate",
     "rct2.music.rock3",
     "rct2.music.candy",
+    "openrct2.music.galaxy",
+    "openrct2.music.acid",
+    "openrct2.music.dodgems",
+    "openrct2.music.blizzard",
+    "openrct2.music.extraterrestrial",
+    "openrct2.music.fairground2",
+    "openrct2.music.ragtime2",
+    "openrct2.music.prehistoric",
+    "openrct2.music.mystic",
+    "openrct2.music.rock4",
+    "openrct2.music.progressive",
 
     // Footpath surfaces
     "rct2.footpath_surface.tarmac",
@@ -133,6 +144,15 @@ const std::string_view DefaultSelectedObjects[] = {
     "rct2.footpath_railings.concrete_green",
     "rct2.footpath_railings.space",
     "rct2.footpath_railings.wood",
+
+    // Peep name objects
+    "rct2.peep_names.original",
+
+    // Peep animation objects
+    "rct2.peep_animations.guest",
+    "rct2.peep_animations.handyman",
+    "rct2.peep_animations.mechanic",
+    "rct2.peep_animations.security",
 };
 
 const std::string_view DesignerSelectedObjects[] = {

@@ -1,5 +1,5 @@
 /*****************************************************************************
- * Copyright (c) 2014-2023 OpenRCT2 developers
+ * Copyright (c) 2014-2025 OpenRCT2 developers
  *
  * For a complete list of all authors, please refer to contributors.md
  * Interested in contributing? Visit https://github.com/OpenRCT2/OpenRCT2
@@ -9,11 +9,13 @@
 
 #include "Font.h"
 
-#include "../localisation/FormatCodes.h"
-#include "../localisation/Language.h"
+#include "../Diagnostic.h"
+#include "../core/EnumUtils.hpp"
+#include "../core/UTF8.h"
+#include "../core/UnicodeChar.h"
 #include "../localisation/LocalisationService.h"
+#include "../rct12/CSChar.h"
 #include "../sprites.h"
-#include "../util/Util.h"
 #include "Drawing.h"
 #include "TTF.h"
 
@@ -21,18 +23,22 @@
 #include <limits>
 #include <unordered_map>
 
-static constexpr const int32_t SpriteFontLineHeight[FontStyleCount] = {
+using namespace OpenRCT2;
+
+static constexpr int32_t kSpriteFontLineHeight[FontStyleCount] = {
     10,
     10,
     6,
 };
 
-static uint8_t _spriteFontCharacterWidths[FontStyleCount][FONT_SPRITE_GLYPH_COUNT];
+static uint8_t _spriteFontCharacterWidths[FontStyleCount][kSpriteFontGlyphCount];
 static uint8_t _additionalSpriteFontCharacterWidth[FontStyleCount][SPR_G2_GLYPH_COUNT] = {};
 
 #ifndef NO_TTF
 TTFFontSetDescriptor* gCurrentTTFFontSet;
 #endif // NO_TTF
+
+constexpr uint8_t CS_SPRITE_FONT_OFFSET = 32;
 
 static const std::unordered_map<char32_t, int32_t> codepointOffsetMap = {
     { UnicodeChar::ae_uc, SPR_G2_AE_UPPER - SPR_CHAR_START },
@@ -117,6 +123,11 @@ static const std::unordered_map<char32_t, int32_t> codepointOffsetMap = {
 
     // Cyrillic alphabet
     { UnicodeChar::cyrillic_io_uc, 203 - CS_SPRITE_FONT_OFFSET }, // Looks just like Ë
+    { UnicodeChar::cyrillic_ukrainian_ie_uc, SPR_G2_CYRILLIC_UKRAINIAN_IE_UPPER - SPR_CHAR_START },
+    { UnicodeChar::cyrillic_dze_uc, 'S' - CS_SPRITE_FONT_OFFSET },
+    { UnicodeChar::cyrillic_dotted_i_uc, 'I' - CS_SPRITE_FONT_OFFSET },
+    { UnicodeChar::cyrillic_yi_uc, 207 - CS_SPRITE_FONT_OFFSET }, // Looks just like Ï
+    { UnicodeChar::cyrillic_je_uc, 'J' - CS_SPRITE_FONT_OFFSET },
     { UnicodeChar::cyrillic_a_uc, 'A' - CS_SPRITE_FONT_OFFSET },
     { UnicodeChar::cyrillic_be_uc, SPR_G2_CYRILLIC_BE_UPPER - SPR_CHAR_START },
     { UnicodeChar::cyrillic_ve_uc, 'B' - CS_SPRITE_FONT_OFFSET },
@@ -183,6 +194,13 @@ static const std::unordered_map<char32_t, int32_t> codepointOffsetMap = {
     { UnicodeChar::cyrillic_yu, SPR_G2_CYRILLIC_YU_LOWER - SPR_CHAR_START },
     { UnicodeChar::cyrillic_ya, SPR_G2_CYRILLIC_YA_LOWER - SPR_CHAR_START },
     { UnicodeChar::cyrillic_io, 235 - CS_SPRITE_FONT_OFFSET }, // Looks just like ë
+    { UnicodeChar::cyrillic_ukrainian_ie, SPR_G2_CYRILLIC_UKRAINIAN_IE_LOWER - SPR_CHAR_START },
+    { UnicodeChar::cyrillic_dze, 's' - CS_SPRITE_FONT_OFFSET },
+    { UnicodeChar::cyrillic_dotted_i, 'i' - CS_SPRITE_FONT_OFFSET },
+    { UnicodeChar::cyrillic_yi, 239 - CS_SPRITE_FONT_OFFSET }, // Looks just like ï
+    { UnicodeChar::cyrillic_je, SPR_G2_J - SPR_CHAR_START },
+    { UnicodeChar::cyrillic_ghe_upturn_uc, SPR_G2_CYRILLIC_GHE_UPTURN_UPPER - SPR_CHAR_START },
+    { UnicodeChar::cyrillic_ghe_upturn, SPR_G2_CYRILLIC_GHE_UPTURN_LOWER - SPR_CHAR_START },
 
     // Punctuation
     { UnicodeChar::left_brace, SPR_G2_LEFT_BRACE - SPR_CHAR_START },
@@ -251,8 +269,8 @@ void FontSpriteInitialiseCharacters()
 
     for (const auto& fontStyle : FontStyles)
     {
-        int32_t glyphOffset = EnumValue(fontStyle) * FONT_SPRITE_GLYPH_COUNT;
-        for (uint8_t glyphIndex = 0; glyphIndex < FONT_SPRITE_GLYPH_COUNT; glyphIndex++)
+        int32_t glyphOffset = EnumValue(fontStyle) * kSpriteFontGlyphCount;
+        for (uint8_t glyphIndex = 0; glyphIndex < kSpriteFontGlyphCount; glyphIndex++)
         {
             const G1Element* g1 = GfxGetG1Element(glyphIndex + SPR_CHAR_START + glyphOffset);
             int32_t width = 0;
@@ -268,7 +286,7 @@ void FontSpriteInitialiseCharacters()
     for (const auto& fontStyle : FontStyles)
     {
         int32_t glyphOffset = EnumValue(fontStyle) * SPR_G2_GLYPH_COUNT;
-        for (int32_t glyphIndex = 0; glyphIndex < SPR_G2_GLYPH_COUNT; glyphIndex++)
+        for (auto glyphIndex = 0u; glyphIndex < SPR_G2_GLYPH_COUNT; glyphIndex++)
         {
             const G1Element* g1 = GfxGetG1Element(glyphIndex + SPR_G2_CHAR_BEGIN + glyphOffset);
             int32_t width = 0;
@@ -305,7 +323,7 @@ int32_t FontSpriteGetCodepointWidth(FontStyle fontStyle, int32_t codepoint)
 {
     int32_t glyphIndex = FontSpriteGetCodepointOffset(codepoint);
     auto baseFontIndex = EnumValue(fontStyle);
-    if (glyphIndex >= FONT_SPRITE_GLYPH_COUNT)
+    if (glyphIndex >= kSpriteFontGlyphCount)
     {
         glyphIndex = (SPR_CHAR_START + glyphIndex) - SPR_G2_CHAR_BEGIN;
 
@@ -317,7 +335,7 @@ int32_t FontSpriteGetCodepointWidth(FontStyle fontStyle, int32_t codepoint)
         return _additionalSpriteFontCharacterWidth[baseFontIndex][glyphIndex];
     }
 
-    if (glyphIndex < 0 || glyphIndex >= static_cast<int32_t>(FONT_SPRITE_GLYPH_COUNT))
+    if (glyphIndex < 0 || glyphIndex >= static_cast<int32_t>(kSpriteFontGlyphCount))
     {
         LOG_WARNING("Invalid glyph index %u", glyphIndex);
         glyphIndex = 0;
@@ -327,9 +345,9 @@ int32_t FontSpriteGetCodepointWidth(FontStyle fontStyle, int32_t codepoint)
 
 ImageId FontSpriteGetCodepointSprite(FontStyle fontStyle, int32_t codepoint)
 {
-    int32_t offset = EnumValue(fontStyle) * FONT_SPRITE_GLYPH_COUNT;
+    int32_t offset = EnumValue(fontStyle) * kSpriteFontGlyphCount;
     auto codePointOffset = FontSpriteGetCodepointOffset(codepoint);
-    if (codePointOffset > FONT_SPRITE_GLYPH_COUNT)
+    if (codePointOffset > kSpriteFontGlyphCount)
     {
         offset = EnumValue(fontStyle) * SPR_G2_GLYPH_COUNT;
     }
@@ -346,7 +364,7 @@ int32_t FontGetLineHeight(FontStyle fontStyle)
         return gCurrentTTFFontSet->size[fontSize].line_height;
     }
 #endif // NO_TTF
-    return SpriteFontLineHeight[fontSize];
+    return kSpriteFontLineHeight[fontSize];
 }
 
 int32_t FontGetLineHeightSmall(FontStyle fontStyle)

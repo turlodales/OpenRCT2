@@ -1,5 +1,5 @@
 /*****************************************************************************
- * Copyright (c) 2014-2023 OpenRCT2 developers
+ * Copyright (c) 2014-2025 OpenRCT2 developers
  *
  * For a complete list of all authors, please refer to contributors.md
  * Interested in contributing? Visit https://github.com/OpenRCT2/OpenRCT2
@@ -11,22 +11,20 @@
 
 #ifdef ENABLE_SCRIPTING
 
-#    include "../windows/Window.h"
-#    include "CustomMenu.h"
-#    include "ScImageManager.hpp"
-#    include "ScTileSelection.hpp"
-#    include "ScViewport.hpp"
-#    include "ScWindow.hpp"
+    #include "../windows/Windows.h"
+    #include "CustomMenu.h"
+    #include "ScImageManager.hpp"
+    #include "ScTileSelection.hpp"
+    #include "ScViewport.hpp"
+    #include "ScWindow.hpp"
 
-#    include <algorithm>
-#    include <memory>
-#    include <openrct2/Context.h>
-#    include <openrct2/Input.h>
-#    include <openrct2/common.h>
-#    include <openrct2/scenario/ScenarioRepository.h>
-#    include <openrct2/scripting/Duktape.hpp>
-#    include <openrct2/scripting/ScriptEngine.h>
-#    include <string>
+    #include <memory>
+    #include <openrct2/Context.h>
+    #include <openrct2/Input.h>
+    #include <openrct2/scenario/ScenarioRepository.h>
+    #include <openrct2/scripting/Duktape.hpp>
+    #include <openrct2/scripting/ScriptEngine.h>
+    #include <string>
 
 namespace OpenRCT2::Scripting
 {
@@ -63,7 +61,8 @@ namespace OpenRCT2::Scripting
         { "other", ScenarioSource::Other },
     });
 
-    template<> inline DukValue ToDuk(duk_context* ctx, const SCENARIO_CATEGORY& value)
+    template<>
+    inline DukValue ToDuk(duk_context* ctx, const SCENARIO_CATEGORY& value)
     {
         const auto& entry = ScenarioCategoryMap.find(value);
         if (entry != ScenarioCategoryMap.end())
@@ -71,7 +70,8 @@ namespace OpenRCT2::Scripting
         return ToDuk(ctx, ScenarioCategoryMap[SCENARIO_CATEGORY_OTHER]);
     }
 
-    template<> inline DukValue ToDuk(duk_context* ctx, const ScenarioSource& value)
+    template<>
+    inline DukValue ToDuk(duk_context* ctx, const ScenarioSource& value)
     {
         const auto& entry = ScenarioSourceMap.find(value);
         if (entry != ScenarioSourceMap.end())
@@ -183,31 +183,33 @@ namespace OpenRCT2::Scripting
 
         void closeWindows(std::string classification, DukValue id)
         {
+            auto* windowMgr = Ui::GetWindowManager();
             auto cls = GetClassification(classification);
             if (cls != WindowClass::Null)
             {
                 if (id.type() == DukValue::Type::NUMBER)
                 {
-                    WindowCloseByNumber(cls, id.as_int());
+                    windowMgr->CloseByNumber(cls, id.as_uint());
                 }
                 else
                 {
-                    WindowCloseByClass(cls);
+                    windowMgr->CloseByClass(cls);
                 }
             }
         }
 
         void closeAllWindows()
         {
-            WindowCloseAll();
+            auto* windowMgr = Ui::GetWindowManager();
+            windowMgr->CloseAll();
         }
 
         std::shared_ptr<ScWindow> getWindow(DukValue a) const
         {
             if (a.type() == DukValue::Type::NUMBER)
             {
-                auto index = a.as_int();
-                auto i = 0;
+                auto index = a.as_uint();
+                size_t i = 0;
                 for (const auto& w : g_window_list)
                 {
                     if (i == index)
@@ -231,22 +233,22 @@ namespace OpenRCT2::Scripting
 
         void showError(const std::string& title, const std::string& message)
         {
-            WindowErrorOpen(title, message);
+            ErrorOpen(title, message);
         }
 
         void showTextInput(const DukValue& desc)
         {
             try
             {
-                constexpr int32_t MaxLengthAllowed = 4096;
+                constexpr int32_t kMaxLengthAllowed = 4096;
                 auto plugin = _scriptEngine.GetExecInfo().GetCurrentPlugin();
                 auto title = desc["title"].as_string();
                 auto description = desc["description"].as_string();
                 auto initialValue = AsOrDefault(desc["initialValue"], "");
-                auto maxLength = AsOrDefault(desc["maxLength"], MaxLengthAllowed);
+                auto maxLength = AsOrDefault(desc["maxLength"], kMaxLengthAllowed);
                 auto callback = desc["callback"];
                 WindowTextInputOpen(
-                    title, description, initialValue, std::clamp(maxLength, 0, MaxLengthAllowed),
+                    title, description, initialValue, std::clamp(maxLength, 0, kMaxLengthAllowed),
                     [this, plugin, callback](std::string_view value) {
                         auto dukValue = ToDuk(_scriptEngine.GetContext(), value);
                         _scriptEngine.ExecutePluginCall(plugin, callback, { dukValue }, false);
@@ -282,7 +284,7 @@ namespace OpenRCT2::Scripting
                 else
                     throw DukException();
 
-                WindowLoadsaveOpen(
+                LoadsaveOpen(
                     loadSaveType, defaultPath,
                     [this, plugin, callback](int32_t result, std::string_view path) {
                         if (result == MODAL_RESULT_OK)
@@ -304,12 +306,10 @@ namespace OpenRCT2::Scripting
             auto plugin = _scriptEngine.GetExecInfo().GetCurrentPlugin();
             auto callback = desc["callback"];
 
-            WindowScenarioselectOpen(
-                [this, plugin, callback](std::string_view path) {
-                    auto dukValue = GetScenarioFile(path);
-                    _scriptEngine.ExecutePluginCall(plugin, callback, { dukValue }, false);
-                },
-                false);
+            ScenarioselectOpen([this, plugin, callback](std::string_view path) {
+                auto dukValue = GetScenarioFile(path);
+                _scriptEngine.ExecutePluginCall(plugin, callback, { dukValue }, false);
+            });
         }
 
         void activateTool(const DukValue& desc)

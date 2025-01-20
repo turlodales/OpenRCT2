@@ -1,5 +1,5 @@
 /*****************************************************************************
- * Copyright (c) 2014-2023 OpenRCT2 developers
+ * Copyright (c) 2014-2025 OpenRCT2 developers
  *
  * For a complete list of all authors, please refer to contributors.md
  * Interested in contributing? Visit https://github.com/OpenRCT2/OpenRCT2
@@ -11,6 +11,9 @@
 
 #include "../Context.h"
 #include "../OpenRCT2.h"
+#include "../ui/WindowManager.h"
+
+using namespace OpenRCT2;
 
 LoadOrQuitAction::LoadOrQuitAction(LoadOrQuitModes mode, PromptMode savePromptMode)
     : _mode(mode)
@@ -51,8 +54,11 @@ GameActions::Result LoadOrQuitAction::Execute() const
             ContextOpenWindow(WindowClass::SavePrompt);
             break;
         case LoadOrQuitModes::CloseSavePrompt:
-            WindowCloseByClass(WindowClass::SavePrompt);
+        {
+            auto* windowMgr = Ui::GetWindowManager();
+            windowMgr->CloseByClass(WindowClass::SavePrompt);
             break;
+        }
         default:
             GameLoadOrQuitNoSavePrompt();
             break;

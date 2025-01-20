@@ -1,5 +1,5 @@
 /*****************************************************************************
- * Copyright (c) 2014-2023 OpenRCT2 developers
+ * Copyright (c) 2014-2025 OpenRCT2 developers
  *
  * For a complete list of all authors, please refer to contributors.md
  * Interested in contributing? Visit https://github.com/OpenRCT2/OpenRCT2
@@ -10,18 +10,22 @@
 #include "ClearAction.h"
 
 #include "../Context.h"
+#include "../GameState.h"
 #include "../core/MemoryStream.h"
 #include "../drawing/Drawing.h"
 #include "../localisation/StringIds.h"
 #include "../management/Finance.h"
 #include "../world/Location.hpp"
 #include "../world/Map.h"
+#include "../world/tile_element/LargeSceneryElement.h"
+#include "../world/tile_element/PathElement.h"
+#include "../world/tile_element/SmallSceneryElement.h"
 #include "FootpathRemoveAction.h"
 #include "LargeSceneryRemoveAction.h"
 #include "SmallSceneryRemoveAction.h"
 #include "WallRemoveAction.h"
 
-#include <algorithm>
+using namespace OpenRCT2;
 
 ClearAction::ClearAction(MapRange range, ClearableItems itemsToClear)
     : _range(range)
@@ -77,18 +81,18 @@ GameActions::Result ClearAction::QueryExecute(bool executing) const
 
     auto noValidTiles = true;
     auto error = GameActions::Status::Ok;
-    StringId errorMessage = STR_NONE;
+    StringId errorMessage = kStringIdNone;
     money64 totalCost = 0;
 
     auto validRange = ClampRangeWithinMap(_range);
-    for (int32_t y = validRange.GetTop(); y <= validRange.GetBottom(); y += COORDS_XY_STEP)
+    for (int32_t y = validRange.GetTop(); y <= validRange.GetBottom(); y += kCoordsXYStep)
     {
-        for (int32_t x = validRange.GetLeft(); x <= validRange.GetRight(); x += COORDS_XY_STEP)
+        for (int32_t x = validRange.GetLeft(); x <= validRange.GetRight(); x += kCoordsXYStep)
         {
             if (LocationValid({ x, y }) && MapCanClearAt({ x, y }))
             {
                 auto cost = ClearSceneryFromTile({ x, y }, executing);
-                if (cost != MONEY64_UNDEFINED)
+                if (cost != kMoney64Undefined)
                 {
                     noValidTiles = false;
                     totalCost += cost;
@@ -216,10 +220,11 @@ money64 ClearAction::ClearSceneryFromTile(const CoordsXY& tilePos, bool executin
 
 void ClearAction::ResetClearLargeSceneryFlag()
 {
+    auto& gameState = GetGameState();
     // TODO: Improve efficiency of this
-    for (int32_t y = 0; y < gMapSize.y; y++)
+    for (int32_t y = 0; y < gameState.MapSize.y; y++)
     {
-        for (int32_t x = 0; x < gMapSize.x; x++)
+        for (int32_t x = 0; x < gameState.MapSize.x; x++)
         {
             auto tileElement = MapGetFirstElementAt(TileCoordsXY{ x, y });
             do
@@ -237,5 +242,6 @@ void ClearAction::ResetClearLargeSceneryFlag()
 
 bool ClearAction::MapCanClearAt(const CoordsXY& location)
 {
-    return (gScreenFlags & SCREEN_FLAGS_SCENARIO_EDITOR) || gCheatsSandboxMode || MapIsLocationOwnedOrHasRights(location);
+    return (gScreenFlags & SCREEN_FLAGS_SCENARIO_EDITOR) || GetGameState().Cheats.sandboxMode
+        || MapIsLocationOwnedOrHasRights(location);
 }

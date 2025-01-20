@@ -1,9 +1,4 @@
 #include "TestData.h"
-#include "openrct2/core/StringReader.h"
-#include "openrct2/entity/Guest.h"
-#include "openrct2/peep/GuestPathfinding.h"
-#include "openrct2/ride/Station.h"
-#include "openrct2/scenario/Scenario.h"
 
 #include <gtest/gtest.h>
 #include <memory>
@@ -11,9 +6,17 @@
 #include <openrct2/Game.h>
 #include <openrct2/OpenRCT2.h>
 #include <openrct2/ParkImporter.h>
+#include <openrct2/core/String.hpp>
+#include <openrct2/core/StringReader.h>
+#include <openrct2/entity/Guest.h>
+#include <openrct2/peep/GuestPathfinding.h>
 #include <openrct2/platform/Platform.h>
+#include <openrct2/ride/RideManager.hpp>
+#include <openrct2/ride/Station.h>
+#include <openrct2/scenario/Scenario.h>
 #include <openrct2/world/Footpath.h>
 #include <openrct2/world/Map.h>
+#include <openrct2/world/tile_element/SurfaceElement.h>
 #include <ostream>
 #include <string>
 
@@ -29,8 +32,6 @@ class PathfindingTestBase : public testing::Test
 public:
     static void SetUpTestCase()
     {
-        Platform::CoreInit();
-
         gOpenRCT2Headless = true;
         gOpenRCT2NoGraphics = true;
         _context = CreateContext();
@@ -59,7 +60,7 @@ protected:
         for (auto& ride : GetRideManager())
         {
             auto thisName = ride.GetName();
-            if (!_strnicmp(thisName.c_str(), name, sizeof(thisName)))
+            if (String::startsWith(thisName, u8string{ name }, true))
             {
                 return &ride;
             }
@@ -86,8 +87,7 @@ protected:
 
         // Pick the direction the peep should initially move in, given the goal position.
         // This will also store the goal position and initialize pathfinding data for the peep.
-        gPeepPathFindGoalPosition = goal;
-        const Direction moveDir = gGuestPathfinder->ChooseDirection(*pos, *peep);
+        const Direction moveDir = PathFinding::ChooseDirection(*pos, goal, *peep, false, RideId::GetNull());
         if (moveDir == INVALID_DIRECTION)
         {
             // Couldn't determine a direction to move off in
@@ -137,7 +137,7 @@ protected:
     static ::testing::AssertionResult AssertIsStartPosition(const char*, const TileCoordsXYZ& location)
     {
         const uint32_t expectedSurfaceStyle = 11u;
-        const uint32_t style = MapGetSurfaceElementAt(location.ToCoordsXYZ())->GetSurfaceStyle();
+        const uint32_t style = MapGetSurfaceElementAt(location.ToCoordsXYZ())->GetSurfaceObjectIndex();
 
         if (style != expectedSurfaceStyle)
             return ::testing::AssertionFailure()
@@ -152,7 +152,7 @@ protected:
     {
         const uint32_t forbiddenSurfaceStyle = 8u;
 
-        const uint32_t style = MapGetSurfaceElementAt(location.ToCoordsXYZ())->GetSurfaceStyle();
+        const uint32_t style = MapGetSurfaceElementAt(location.ToCoordsXYZ())->GetSurfaceObjectIndex();
 
         if (style == forbiddenSurfaceStyle)
             return ::testing::AssertionFailure()

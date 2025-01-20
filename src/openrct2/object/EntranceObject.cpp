@@ -1,5 +1,5 @@
 /*****************************************************************************
- * Copyright (c) 2014-2023 OpenRCT2 developers
+ * Copyright (c) 2014-2025 OpenRCT2 developers
  *
  * For a complete list of all authors, please refer to contributors.md
  * Interested in contributing? Visit https://github.com/OpenRCT2/OpenRCT2
@@ -9,11 +9,15 @@
 
 #include "EntranceObject.h"
 
+#include "../core/Guard.hpp"
 #include "../core/IStream.hpp"
 #include "../core/Json.hpp"
 #include "../core/String.hpp"
 #include "../drawing/Drawing.h"
-#include "../localisation/Localisation.h"
+#include "../localisation/LocalisationService.h"
+#include "../paint/tile_element/Paint.TileElement.h"
+
+using namespace OpenRCT2;
 
 void EntranceObject::ReadLegacy(IReadObjectContext* context, OpenRCT2::IStream* stream)
 {
@@ -44,7 +48,6 @@ void EntranceObject::Unload()
 void EntranceObject::DrawPreview(DrawPixelInfo& dpi, int32_t width, int32_t height) const
 {
     auto screenCoords = ScreenCoordsXY{ width / 2, height / 2 };
-
     GfxDrawSprite(dpi, ImageId(_legacyType.image_id + 1), screenCoords + ScreenCoordsXY{ -32, 14 });
     GfxDrawSprite(dpi, ImageId(_legacyType.image_id + 0), screenCoords + ScreenCoordsXY{ 0, 28 });
     GfxDrawSprite(dpi, ImageId(_legacyType.image_id + 2), screenCoords + ScreenCoordsXY{ 32, 44 });
@@ -68,7 +71,7 @@ void EntranceObject::ReadJson(IReadObjectContext* context, json_t& root)
 ImageIndex EntranceObject::GetImage(uint8_t sequence, Direction direction) const
 {
     if (sequence > 2)
-        return ImageIndexUndefined;
+        return kImageIndexUndefined;
     return _legacyType.image_id + ((direction & 3) * 3) + sequence;
 }
 

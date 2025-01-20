@@ -1,5 +1,5 @@
 /*****************************************************************************
- * Copyright (c) 2014-2023 OpenRCT2 developers
+ * Copyright (c) 2014-2025 OpenRCT2 developers
  *
  * For a complete list of all authors, please refer to contributors.md
  * Interested in contributing? Visit https://github.com/OpenRCT2/OpenRCT2
@@ -9,6 +9,7 @@
 
 #include "BannerObject.h"
 
+#include "../core/Guard.hpp"
 #include "../core/IStream.hpp"
 #include "../core/Json.hpp"
 #include "../drawing/Drawing.h"
@@ -16,6 +17,8 @@
 #include "../object/Object.h"
 #include "../object/ObjectRepository.h"
 #include "ObjectList.h"
+
+using namespace OpenRCT2;
 
 void BannerObject::ReadLegacy(IReadObjectContext* context, OpenRCT2::IStream* stream)
 {
@@ -41,10 +44,9 @@ void BannerObject::ReadLegacy(IReadObjectContext* context, OpenRCT2::IStream* st
 
     // Add banners to 'Signs and items for footpaths' group, rather than lumping them in the Miscellaneous tab.
     // Since this is already done the other way round for original items, avoid adding those to prevent duplicates.
-    auto identifier = GetLegacyIdentifier();
 
     auto& objectRepository = context->GetObjectRepository();
-    auto item = objectRepository.FindObjectLegacy(identifier);
+    auto item = objectRepository.FindObject(GetDescriptor());
     if (item != nullptr)
     {
         auto sourceGame = item->GetFirstSourceGame();

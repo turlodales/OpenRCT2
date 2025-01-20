@@ -1,5 +1,5 @@
 /*****************************************************************************
- * Copyright (c) 2014-2023 OpenRCT2 developers
+ * Copyright (c) 2014-2025 OpenRCT2 developers
  *
  * For a complete list of all authors, please refer to contributors.md
  * Interested in contributing? Visit https://github.com/OpenRCT2/OpenRCT2
@@ -9,7 +9,10 @@
 
 #include "ObjectFactory.h"
 
+#include "../Context.h"
+#include "../Diagnostic.h"
 #include "../OpenRCT2.h"
+#include "../PlatformEnvironment.h"
 #include "../audio/audio.h"
 #include "../core/Console.hpp"
 #include "../core/File.h"
@@ -24,7 +27,6 @@
 #include "AudioObject.h"
 #include "BannerObject.h"
 #include "EntranceObject.h"
-#include "FootpathItemObject.h"
 #include "FootpathObject.h"
 #include "FootpathRailingsObject.h"
 #include "FootpathSurfaceObject.h"
@@ -33,7 +35,11 @@
 #include "Object.h"
 #include "ObjectLimits.h"
 #include "ObjectList.h"
+#include "PathAdditionObject.h"
+#include "PeepAnimationsObject.h"
+#include "PeepNamesObject.h"
 #include "RideObject.h"
+#include "ScenarioTextObject.h"
 #include "SceneryGroupObject.h"
 #include "SmallSceneryObject.h"
 #include "StationObject.h"
@@ -42,15 +48,16 @@
 #include "WallObject.h"
 #include "WaterObject.h"
 
-#include <algorithm>
 #include <memory>
 #include <unordered_map>
+
+using namespace OpenRCT2;
 
 struct IFileDataRetriever
 {
     virtual ~IFileDataRetriever() = default;
-    virtual std::vector<uint8_t> GetData(std::string_view path) const abstract;
-    virtual ObjectAsset GetAsset(std::string_view path) const abstract;
+    virtual std::vector<uint8_t> GetData(std::string_view path) const = 0;
+    virtual ObjectAsset GetAsset(std::string_view path) const = 0;
 };
 
 class FileSystemDataRetriever : public IFileDataRetriever
@@ -182,7 +189,7 @@ public:
     {
         _wasVerbose = true;
 
-        if (!String::IsNullOrEmpty(text))
+        if (!String::isNullOrEmpty(text))
         {
             LOG_VERBOSE("[%s] Info (%d): %s", _identifier.c_str(), code, text);
         }
@@ -192,7 +199,7 @@ public:
     {
         _wasWarning = true;
 
-        if (!String::IsNullOrEmpty(text))
+        if (!String::isNullOrEmpty(text))
         {
             Console::Error::WriteLine("[%s] Warning (%d): %s", _identifier.c_str(), code, text);
         }
@@ -202,14 +209,14 @@ public:
     {
         _wasError = true;
 
-        if (!String::IsNullOrEmpty(text))
+        if (!String::isNullOrEmpty(text))
         {
             Console::Error::WriteLine("[%s] Error (%d): %s", _identifier.c_str(), code, text);
         }
     }
 };
 
-namespace ObjectFactory
+namespace OpenRCT2::ObjectFactory
 {
     /**
      * @param jRoot Must be JSON node of type object
@@ -268,7 +275,7 @@ namespace ObjectFactory
                 result = CreateObject(entry.GetType());
                 result->SetDescriptor(ObjectEntryDescriptor(entry));
 
-                utf8 objectName[DAT_NAME_LENGTH + 1] = { 0 };
+                utf8 objectName[kDatNameLength + 1] = { 0 };
                 ObjectEntryGetNameFixed(objectName, sizeof(objectName), &entry);
                 LOG_VERBOSE("  entry: { 0x%08X, \"%s\", 0x%08X }", entry.flags, objectName, entry.checksum);
 
@@ -303,7 +310,7 @@ namespace ObjectFactory
         {
             result->SetDescriptor(ObjectEntryDescriptor(*entry));
 
-            utf8 objectName[DAT_NAME_LENGTH + 1];
+            utf8 objectName[kDatNameLength + 1];
             ObjectEntryGetNameFixed(objectName, sizeof(objectName), entry);
 
             auto readContext = ReadObjectContext(objectRepository, objectName, !gOpenRCT2NoGraphics, nullptr);
@@ -345,8 +352,8 @@ namespace ObjectFactory
             case ObjectType::Paths:
                 result = std::make_unique<FootpathObject>();
                 break;
-            case ObjectType::PathBits:
-                result = std::make_unique<FootpathItemObject>();
+            case ObjectType::PathAdditions:
+                result = std::make_unique<PathAdditionObject>();
                 break;
             case ObjectType::SceneryGroup:
                 result = std::make_unique<SceneryGroupObject>();
@@ -358,6 +365,7 @@ namespace ObjectFactory
                 result = std::make_unique<WaterObject>();
                 break;
             case ObjectType::ScenarioText:
+                result = std::make_unique<ScenarioTextObject>();
                 break;
             case ObjectType::TerrainSurface:
                 result = std::make_unique<TerrainSurfaceObject>();
@@ -380,6 +388,12 @@ namespace ObjectFactory
             case ObjectType::Audio:
                 result = std::make_unique<AudioObject>();
                 break;
+            case ObjectType::PeepNames:
+                result = std::make_unique<PeepNamesObject>();
+                break;
+            case ObjectType::PeepAnimations:
+                result = std::make_unique<PeepAnimationsObject>();
+                break;
             default:
                 throw std::runtime_error("Invalid object type");
         }
@@ -393,7 +407,7 @@ namespace ObjectFactory
         if (s == "footpath_banner")
             return ObjectType::Banners;
         if (s == "footpath_item")
-            return ObjectType::PathBits;
+            return ObjectType::PathAdditions;
         if (s == "scenery_small")
             return ObjectType::SmallScenery;
         if (s == "scenery_large")
@@ -406,6 +420,8 @@ namespace ObjectFactory
             return ObjectType::ParkEntrance;
         if (s == "water")
             return ObjectType::Water;
+        if (s == "scenario_text")
+            return ObjectType::ScenarioText;
         if (s == "terrain_surface")
             return ObjectType::TerrainSurface;
         if (s == "terrain_edge")
@@ -420,6 +436,10 @@ namespace ObjectFactory
             return ObjectType::FootpathRailings;
         if (s == "audio")
             return ObjectType::Audio;
+        if (s == "peep_names")
+            return ObjectType::PeepNames;
+        if (s == "peep_animations")
+            return ObjectType::PeepAnimations;
         return ObjectType::None;
     }
 
@@ -500,6 +520,12 @@ namespace ObjectFactory
         }
     }
 
+    static bool isUsingClassic()
+    {
+        auto env = OpenRCT2::GetContext()->GetPlatformEnvironment();
+        return env->IsUsingClassic();
+    }
+
     std::unique_ptr<Object> CreateObjectFromJson(
         IObjectRepository& objectRepository, json_t& jRoot, const IFileDataRetriever* fileRetriever, bool loadImageTable)
     {
@@ -517,9 +543,13 @@ namespace ObjectFactory
         {
             auto id = Json::GetString(jRoot["id"]);
 
-            // HACK Disguise RCT Classic audio as RCT2 audio so asset packs override correctly
-            if (id == OpenRCT2::Audio::AudioObjectIdentifiers::RCTCBase)
-                id = OpenRCT2::Audio::AudioObjectIdentifiers::RCT2Base;
+            // Base audio files are renamed to a common, virtual name so asset packs can override it correctly.
+            const bool isRCT2BaseAudio = id == OpenRCT2::Audio::AudioObjectIdentifiers::kRCT2Base && !isUsingClassic();
+            const bool isRCTCBaseAudio = id == OpenRCT2::Audio::AudioObjectIdentifiers::kRCTCBase && isUsingClassic();
+            if (isRCT2BaseAudio || isRCTCBaseAudio)
+            {
+                id = OpenRCT2::Audio::AudioObjectIdentifiers::kRCT2;
+            }
 
             auto version = VersionTuple(Json::GetString(jRoot["version"]));
             ObjectEntryDescriptor descriptor;
@@ -531,10 +561,20 @@ namespace ObjectFactory
                 RCTObjectEntry entry = {};
                 entry.flags = std::stoul(originalId.substr(0, 8), nullptr, 16);
                 entry.checksum = std::stoul(originalId.substr(18, 8), nullptr, 16);
-                entry.SetType(objectType);
                 auto minLength = std::min<size_t>(8, originalName.length());
                 std::memcpy(entry.name, originalName.c_str(), minLength);
-                descriptor = ObjectEntryDescriptor(entry);
+
+                // Some bad objects try to override different types
+                if (entry.GetType() != objectType)
+                {
+                    LOG_ERROR(
+                        "Object \"%s\" has invalid originalId set \"%s\". Ignoring override.", id.c_str(), originalId.c_str());
+                    descriptor = ObjectEntryDescriptor(objectType, id);
+                }
+                else
+                {
+                    descriptor = ObjectEntryDescriptor(entry);
+                }
             }
             else
             {
@@ -569,4 +609,4 @@ namespace ObjectFactory
         }
         return result;
     }
-} // namespace ObjectFactory
+} // namespace OpenRCT2::ObjectFactory

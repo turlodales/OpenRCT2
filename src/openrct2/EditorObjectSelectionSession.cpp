@@ -1,5 +1,5 @@
 /*****************************************************************************
- * Copyright (c) 2014-2023 OpenRCT2 developers
+ * Copyright (c) 2014-2025 OpenRCT2 developers
  *
  * For a complete list of all authors, please refer to contributors.md
  * Interested in contributing? Visit https://github.com/OpenRCT2/OpenRCT2
@@ -10,12 +10,15 @@
 #include "EditorObjectSelectionSession.h"
 
 #include "Context.h"
+#include "Diagnostic.h"
 #include "Editor.h"
 #include "Game.h"
+#include "GameState.h"
 #include "OpenRCT2.h"
 #include "drawing/Drawing.h"
+#include "entity/Guest.h"
+#include "entity/Staff.h"
 #include "localisation/Formatter.h"
-#include "localisation/Localisation.h"
 #include "management/Research.h"
 #include "object/DefaultObjects.h"
 #include "object/FootpathEntry.h"
@@ -23,19 +26,28 @@
 #include "object/ObjectManager.h"
 #include "object/ObjectRepository.h"
 #include "ride/RideData.h"
+#include "ride/RideManager.hpp"
 #include "ride/TrainManager.h"
 #include "ride/Vehicle.h"
 #include "scenario/Scenario.h"
 #include "windows/Intent.h"
-#include "world/Footpath.h"
-#include "world/Scenery.h"
+#include "world/tile_element/BannerElement.h"
+#include "world/tile_element/EntranceElement.h"
+#include "world/tile_element/LargeSceneryElement.h"
+#include "world/tile_element/PathElement.h"
+#include "world/tile_element/SmallSceneryElement.h"
+#include "world/tile_element/SurfaceElement.h"
+#include "world/tile_element/TileElement.h"
+#include "world/tile_element/WallElement.h"
 
 #include <iterator>
 #include <vector>
 
+using namespace OpenRCT2;
+
 std::optional<StringId> _gSceneryGroupPartialSelectError;
 std::vector<uint8_t> _objectSelectionFlags;
-int32_t _numSelectedObjectsForType[EnumValue(ObjectType::Count)];
+uint32_t _numSelectedObjectsForType[EnumValue(ObjectType::Count)];
 static int32_t _numAvailableObjectsForType[EnumValue(ObjectType::Count)];
 
 static void SetupInUseSelectionFlags();
@@ -46,9 +58,7 @@ static void SelectDesignerObjects();
 static void ReplaceSelectedWaterPalette(const ObjectRepositoryItem* item);
 
 /**
- * Master objects are objects that are not
- * optional / required dependants of an
- * object.
+ * Master objects are objects that are not optional / required dependants of an object.
  */
 static constexpr ResultWithMessage ObjectSelectionError(bool isMasterObject, StringId message)
 {
@@ -76,7 +86,7 @@ static void SetupTrackManagerObjects()
 
             for (auto rideType : item->RideInfo.RideType)
             {
-                if (GetRideTypeDescriptor(rideType).HasFlag(RIDE_TYPE_FLAG_HAS_TRACK))
+                if (GetRideTypeDescriptor(rideType).HasFlag(RtdFlag::hasTrack))
                 {
                     *selectionFlags &= ~ObjectSelectionFlags::Flag6;
                     break;
@@ -107,7 +117,7 @@ static void SetupTrackDesignerObjects()
             {
                 if (rideType != RIDE_TYPE_NULL)
                 {
-                    if (GetRideTypeDescriptor(rideType).HasFlag(RIDE_TYPE_FLAG_SHOW_IN_TRACK_DESIGNER))
+                    if (GetRideTypeDescriptor(rideType).HasFlag(RtdFlag::showInTrackDesigner))
                     {
                         *selectionFlags &= ~ObjectSelectionFlags::Flag6;
                         break;
@@ -126,9 +136,9 @@ void SetupInUseSelectionFlags()
 {
     auto& objectMgr = OpenRCT2::GetContext()->GetObjectManager();
 
-    for (auto objectType : TransientObjectTypes)
+    for (auto objectType : getTransientObjectTypes())
     {
-        for (int32_t i = 0; i < object_entry_group_counts[EnumValue(objectType)]; i++)
+        for (auto i = 0u; i < getObjectEntryGroupCount(objectType); i++)
         {
             Editor::ClearSelectedObject(static_cast<ObjectType>(objectType), i, ObjectSelectionFlags::AllFlags);
 
@@ -152,8 +162,8 @@ void SetupInUseSelectionFlags()
             case TileElementType::Surface:
             {
                 auto surfaceEl = iter.element->AsSurface();
-                auto surfaceIndex = surfaceEl->GetSurfaceStyle();
-                auto edgeIndex = surfaceEl->GetEdgeStyle();
+                auto surfaceIndex = surfaceEl->GetSurfaceObjectIndex();
+                auto edgeIndex = surfaceEl->GetEdgeObjectIndex();
 
                 Editor::SetSelectedObject(ObjectType::TerrainSurface, surfaceIndex, ObjectSelectionFlags::InUse);
                 Editor::SetSelectedObject(ObjectType::TerrainEdge, edgeIndex, ObjectSelectionFlags::InUse);
@@ -179,7 +189,7 @@ void SetupInUseSelectionFlags()
                 if (footpathEl->HasAddition())
                 {
                     auto pathAdditionEntryIndex = footpathEl->GetAdditionEntryIndex();
-                    Editor::SetSelectedObject(ObjectType::PathBits, pathAdditionEntryIndex, ObjectSelectionFlags::InUse);
+                    Editor::SetSelectedObject(ObjectType::PathAdditions, pathAdditionEntryIndex, ObjectSelectionFlags::InUse);
                 }
                 break;
             }
@@ -193,7 +203,8 @@ void SetupInUseSelectionFlags()
                 if (parkEntranceEl->GetEntranceType() != ENTRANCE_TYPE_PARK_ENTRANCE)
                     break;
 
-                Editor::SetSelectedObject(ObjectType::ParkEntrance, 0, ObjectSelectionFlags::InUse);
+                type = iter.element->AsEntrance()->getEntryIndex();
+                Editor::SetSelectedObject(ObjectType::ParkEntrance, type, ObjectSelectionFlags::InUse);
 
                 // Skip if not the middle part
                 if (parkEntranceEl->GetSequenceIndex() != 0)
@@ -237,6 +248,24 @@ void SetupInUseSelectionFlags()
         Editor::SetSelectedObject(ObjectType::Ride, ride.subtype, ObjectSelectionFlags::InUse);
         Editor::SetSelectedObject(ObjectType::Station, ride.entrance_style, ObjectSelectionFlags::InUse);
         Editor::SetSelectedObject(ObjectType::Music, ride.music, ObjectSelectionFlags::InUse);
+    }
+
+    ObjectEntryIndex lastIndex = OBJECT_ENTRY_INDEX_NULL;
+    for (auto* peep : EntityList<Guest>())
+    {
+        if (peep->AnimationObjectIndex == lastIndex)
+            continue;
+
+        lastIndex = peep->AnimationObjectIndex;
+        Editor::SetSelectedObject(ObjectType::PeepAnimations, lastIndex, ObjectSelectionFlags::InUse);
+    }
+    for (auto* peep : EntityList<Staff>())
+    {
+        if (peep->AnimationObjectIndex == lastIndex)
+            continue;
+
+        lastIndex = peep->AnimationObjectIndex;
+        Editor::SetSelectedObject(ObjectType::PeepAnimations, lastIndex, ObjectSelectionFlags::InUse);
     }
 
     // Apply selected object status for hacked vehicles that may not have an associated ride
@@ -481,18 +510,30 @@ void ResetSelectedObjectCountAndSize()
 
 void FinishObjectSelection()
 {
+    auto& gameState = GetGameState();
     if (gScreenFlags & SCREEN_FLAGS_TRACK_DESIGNER)
     {
         SetEveryRideTypeInvented();
         SetEveryRideEntryInvented();
-        gEditorStep = EditorStep::RollercoasterDesigner;
+
+        auto& objManager = OpenRCT2::GetContext()->GetObjectManager();
+        gameState.LastEntranceStyle = objManager.GetLoadedObjectEntryIndex("rct2.station.plain");
+        if (gameState.LastEntranceStyle == OBJECT_ENTRY_INDEX_NULL)
+        {
+            gameState.LastEntranceStyle = 0;
+        }
+
+        gameState.EditorStep = EditorStep::RollercoasterDesigner;
         GfxInvalidateScreen();
     }
     else
     {
         SetAllSceneryItemsInvented();
-        ScenerySetDefaultPlacementConfiguration();
-        gEditorStep = EditorStep::LandscapeEditor;
+
+        auto intent = Intent(INTENT_ACTION_SET_DEFAULT_SCENERY_CONFIG);
+        ContextBroadcastIntent(&intent);
+
+        gameState.EditorStep = EditorStep::LandscapeEditor;
         GfxInvalidateScreen();
     }
 }
@@ -572,7 +613,7 @@ ResultWithMessage WindowEditorObjectSelectionSelectObject(
     }
 
     ObjectType objectType = item->Type;
-    uint16_t maxObjects = object_entry_group_counts[EnumValue(objectType)];
+    auto maxObjects = getObjectEntryGroupCount(objectType);
 
     if (maxObjects <= _numSelectedObjectsForType[EnumValue(objectType)])
     {
@@ -595,6 +636,10 @@ ResultWithMessage WindowEditorObjectSelectionSelectObject(
     {
         // Replace old palette with newly selected palette immediately.
         ReplaceSelectedWaterPalette(item);
+    }
+    else if (objectType == ObjectType::PeepNames)
+    {
+        PeepUpdateNames();
     }
 
     if (isMasterObject != 0 && !(flags & INPUT_FLAG_EDITOR_OBJECT_1))
@@ -641,6 +686,23 @@ bool EditorCheckObjectGroupAtLeastOneSelected(ObjectType checkObjectType)
     return false;
 }
 
+bool EditorCheckObjectGroupAtLeastOneOfPeepTypeSelected(uint8_t peepType)
+{
+    auto numObjects = std::min(ObjectRepositoryGetItemsCount(), _objectSelectionFlags.size());
+    const ObjectRepositoryItem* items = ObjectRepositoryGetItems();
+
+    for (size_t i = 0; i < numObjects; i++)
+    {
+        const auto isAnimObjectType = items[i].Type == ObjectType::PeepAnimations;
+        const bool isSelected = _objectSelectionFlags[i] & ObjectSelectionFlags::Selected;
+        if (isAnimObjectType && isSelected && items[i].PeepAnimationsInfo.PeepType == peepType)
+        {
+            return true;
+        }
+    }
+    return false;
+}
+
 bool EditorCheckObjectGroupAtLeastOneSurfaceSelected(bool queue)
 {
     auto numObjects = std::min(ObjectRepositoryGetItemsCount(), _objectSelectionFlags.size());
@@ -679,9 +741,16 @@ int32_t EditorRemoveUnusedObjects()
                 if (ObjectTypeIsIntransient(objectType))
                     continue;
 
-                // These object types require exactly one object to be selected at all times.
-                // Removing that object can badly break the game state.
-                if (objectType == ObjectType::ParkEntrance || objectType == ObjectType::Water)
+                // The water type controls the entire palette. Removing that object can badly break the game state.
+                if (objectType == ObjectType::Water)
+                    continue;
+
+                // Avoid the used peep names object being deleted as no in-use checks are performed.
+                if (objectType == ObjectType::PeepNames)
+                    continue;
+
+                // Avoid deleting peep animation objects, as it ensures we don't delete the last ones for a kind of peep.
+                if (objectType == ObjectType::PeepAnimations)
                     continue;
 
                 // It’s hard to determine exactly if a scenery group is used, so do not remove these automatically.

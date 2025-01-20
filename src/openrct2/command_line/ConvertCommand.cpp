@@ -1,5 +1,5 @@
 /*****************************************************************************
- * Copyright (c) 2014-2023 OpenRCT2 developers
+ * Copyright (c) 2014-2025 OpenRCT2 developers
  *
  * For a complete list of all authors, please refer to contributors.md
  * Interested in contributing? Visit https://github.com/OpenRCT2/OpenRCT2
@@ -9,18 +9,22 @@
 
 #include "../Context.h"
 #include "../FileClassifier.h"
+#include "../GameState.h"
 #include "../OpenRCT2.h"
 #include "../ParkImporter.h"
-#include "../common.h"
 #include "../core/Console.hpp"
 #include "../core/Path.hpp"
 #include "../interface/Window.h"
 #include "../object/ObjectManager.h"
 #include "../park/ParkFile.h"
 #include "../scenario/Scenario.h"
+#include "../ui/WindowManager.h"
 #include "CommandLine.hpp"
 
+#include <cassert>
 #include <memory>
+
+using namespace OpenRCT2;
 
 static void WriteConvertFromAndToMessage(FileExtension sourceFileType, FileExtension destinationFileType);
 static u8string GetFileTypeFriendlyName(FileExtension fileType);
@@ -90,6 +94,7 @@ exitcode_t CommandLine::HandleCommandConvert(CommandLineArgEnumerator* enumerato
     context->Initialise();
 
     auto& objManager = context->GetObjectManager();
+    auto& gameState = GetGameState();
 
     try
     {
@@ -98,7 +103,8 @@ exitcode_t CommandLine::HandleCommandConvert(CommandLineArgEnumerator* enumerato
 
         objManager.LoadObjects(loadResult.RequiredObjects);
 
-        importer->Import();
+        // TODO: Have a separate GameState and exchange once loaded.
+        importer->Import(gameState);
     }
     catch (const std::exception& ex)
     {
@@ -109,7 +115,7 @@ exitcode_t CommandLine::HandleCommandConvert(CommandLineArgEnumerator* enumerato
     if (sourceFileType == FileExtension::SC4 || sourceFileType == FileExtension::SC6)
     {
         // We are converting a scenario, so reset the park
-        ScenarioBegin();
+        ScenarioBegin(gameState);
     }
 
     try
@@ -118,9 +124,10 @@ exitcode_t CommandLine::HandleCommandConvert(CommandLineArgEnumerator* enumerato
 
         // HACK remove the main window so it saves the park with the
         //      correct initial view
-        WindowCloseByClass(WindowClass::MainWindow);
+        auto* windowMgr = Ui::GetWindowManager();
+        windowMgr->CloseByClass(WindowClass::MainWindow);
 
-        exporter->Export(destinationPath);
+        exporter->Export(gameState, destinationPath);
     }
     catch (const std::exception& ex)
     {

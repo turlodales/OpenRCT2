@@ -1,5 +1,5 @@
 /*****************************************************************************
- * Copyright (c) 2014-2023 OpenRCT2 developers
+ * Copyright (c) 2014-2025 OpenRCT2 developers
  *
  * For a complete list of all authors, please refer to contributors.md
  * Interested in contributing? Visit https://github.com/OpenRCT2/OpenRCT2
@@ -11,23 +11,23 @@
 
 #ifdef ENABLE_SCRIPTING
 
-#    include "../../../OpenRCT2.h"
-#    include "../../../actions/GameAction.h"
-#    include "../../../interface/Screenshot.h"
-#    include "../../../localisation/Formatting.h"
-#    include "../../../object/ObjectManager.h"
-#    include "../../../scenario/Scenario.h"
-#    include "../../Duktape.hpp"
-#    include "../../HookEngine.h"
-#    include "../../IconNames.hpp"
-#    include "../../ScriptEngine.h"
-#    include "../game/ScConfiguration.hpp"
-#    include "../game/ScDisposable.hpp"
-#    include "../object/ScObject.hpp"
-#    include "../ride/ScTrackSegment.h"
+    #include "../../../OpenRCT2.h"
+    #include "../../../actions/GameAction.h"
+    #include "../../../interface/Screenshot.h"
+    #include "../../../localisation/Formatting.h"
+    #include "../../../object/ObjectManager.h"
+    #include "../../../scenario/Scenario.h"
+    #include "../../Duktape.hpp"
+    #include "../../HookEngine.h"
+    #include "../../IconNames.hpp"
+    #include "../../ScriptEngine.h"
+    #include "../game/ScConfiguration.hpp"
+    #include "../game/ScDisposable.hpp"
+    #include "../object/ScObjectManager.h"
+    #include "../ride/ScTrackSegment.h"
 
-#    include <cstdio>
-#    include <memory>
+    #include <cstdio>
+    #include <memory>
 
 namespace OpenRCT2::Scripting
 {
@@ -47,7 +47,7 @@ namespace OpenRCT2::Scripting
     private:
         int32_t apiVersion_get()
         {
-            return OPENRCT2_PLUGIN_API_VERSION;
+            return kPluginApiVersion;
         }
 
         std::shared_ptr<ScConfiguration> configuration_get()
@@ -126,6 +126,18 @@ namespace OpenRCT2::Scripting
             return "normal";
         }
 
+        bool paused_get()
+        {
+            return GameIsPaused();
+        }
+
+        void paused_set(const bool& value)
+        {
+            ThrowIfGameStateNotMutable();
+            if (value != GameIsPaused())
+                PauseToggle();
+        }
+
         void captureImage(const DukValue& options)
         {
             auto ctx = GetContext()->GetScriptEngine().GetContext();
@@ -133,8 +145,8 @@ namespace OpenRCT2::Scripting
             {
                 CaptureOptions captureOptions;
                 captureOptions.Filename = fs::u8path(AsOrDefault(options["filename"], ""));
-                captureOptions.Rotation = options["rotation"].as_int() & 3;
-                captureOptions.Zoom = ZoomLevel(options["zoom"].as_int());
+                captureOptions.Rotation = options["rotation"].as_uint() & 3;
+                captureOptions.Zoom = ZoomLevel(options["zoom"].as_uint());
                 captureOptions.Transparent = AsOrDefault(options["transparent"], false);
 
                 auto dukPosition = options["position"];
@@ -160,76 +172,30 @@ namespace OpenRCT2::Scripting
             }
         }
 
-        static DukValue CreateScObject(duk_context* ctx, ObjectType type, int32_t index)
-        {
-            switch (type)
-            {
-                case ObjectType::Ride:
-                    return GetObjectAsDukValue(ctx, std::make_shared<ScRideObject>(type, index));
-                case ObjectType::SmallScenery:
-                    return GetObjectAsDukValue(ctx, std::make_shared<ScSmallSceneryObject>(type, index));
-                default:
-                    return GetObjectAsDukValue(ctx, std::make_shared<ScObject>(type, index));
-            }
-        }
-
         DukValue getObject(const std::string& typez, int32_t index) const
         {
-            auto ctx = GetContext()->GetScriptEngine().GetContext();
-            auto& objManager = GetContext()->GetObjectManager();
-
-            auto type = ScObject::StringToObjectType(typez);
-            if (type)
-            {
-                auto obj = objManager.GetLoadedObject(*type, index);
-                if (obj != nullptr)
-                {
-                    return CreateScObject(ctx, *type, index);
-                }
-            }
-            else
-            {
-                duk_error(ctx, DUK_ERR_ERROR, "Invalid object type.");
-            }
-            return ToDuk(ctx, nullptr);
+            // deprecated function, moved to ObjectManager.getObject.
+            ScObjectManager objectManager;
+            return objectManager.getObject(typez, index);
         }
 
         std::vector<DukValue> getAllObjects(const std::string& typez) const
         {
-            auto ctx = GetContext()->GetScriptEngine().GetContext();
-            auto& objManager = GetContext()->GetObjectManager();
-
-            std::vector<DukValue> result;
-            auto type = ScObject::StringToObjectType(typez);
-            if (type)
-            {
-                auto count = object_entry_group_counts[EnumValue(*type)];
-                for (int32_t i = 0; i < count; i++)
-                {
-                    auto obj = objManager.GetLoadedObject(*type, i);
-                    if (obj != nullptr)
-                    {
-                        result.push_back(CreateScObject(ctx, *type, i));
-                    }
-                }
-            }
-            else
-            {
-                duk_error(ctx, DUK_ERR_ERROR, "Invalid object type.");
-            }
-            return result;
+            // deprecated function, moved to ObjectManager.getAllObjects.
+            ScObjectManager objectManager;
+            return objectManager.getAllObjects(typez);
         }
 
-        DukValue getTrackSegment(track_type_t type)
+        DukValue getTrackSegment(uint16_t type)
         {
             auto ctx = GetContext()->GetScriptEngine().GetContext();
-            if (type >= TrackElemType::Count)
+            if (type >= EnumValue(TrackElemType::Count))
             {
                 return ToDuk(ctx, nullptr);
             }
             else
             {
-                return GetObjectAsDukValue(ctx, std::make_shared<ScTrackSegment>(type));
+                return GetObjectAsDukValue(ctx, std::make_shared<ScTrackSegment>(static_cast<TrackElemType>(type)));
             }
         }
 
@@ -238,9 +204,9 @@ namespace OpenRCT2::Scripting
             auto ctx = GetContext()->GetScriptEngine().GetContext();
 
             std::vector<DukValue> result;
-            for (track_type_t type = 0; type < TrackElemType::Count; type++)
+            for (uint16_t type = 0; type < EnumValue(TrackElemType::Count); type++)
             {
-                auto obj = std::make_shared<ScTrackSegment>(type);
+                auto obj = std::make_shared<ScTrackSegment>(static_cast<TrackElemType>(type));
                 if (obj != nullptr)
                 {
                     result.push_back(GetObjectAsDukValue(ctx, obj));
@@ -301,6 +267,20 @@ namespace OpenRCT2::Scripting
             return 1;
         }
 
+    #ifdef _MSC_VER
+        // HACK workaround to resolve issue #14853
+        //      The exception thrown in duk_error was causing a crash when RAII kicked in for this lambda.
+        //      Only ensuring it was not in the same generated method fixed it.
+        __declspec(noinline)
+    #endif
+        std::shared_ptr<ScDisposable>
+            CreateSubscription(HOOK_TYPE hookType, const DukValue& callback)
+        {
+            auto owner = _execInfo.GetCurrentPlugin();
+            auto cookie = _hookEngine.Subscribe(hookType, owner, callback);
+            return std::make_shared<ScDisposable>([this, hookType, cookie]() { _hookEngine.Unsubscribe(hookType, cookie); });
+        }
+
         std::shared_ptr<ScDisposable> subscribe(const std::string& hook, const DukValue& callback)
         {
             auto& scriptEngine = GetContext()->GetScriptEngine();
@@ -328,8 +308,7 @@ namespace OpenRCT2::Scripting
                 duk_error(ctx, DUK_ERR_ERROR, "Hook type not available for this plugin type.");
             }
 
-            auto cookie = _hookEngine.Subscribe(hookType, owner, callback);
-            return std::make_shared<ScDisposable>([this, hookType, cookie]() { _hookEngine.Unsubscribe(hookType, cookie); });
+            return CreateSubscription(hookType, callback);
         }
 
         void queryAction(const std::string& action, const DukValue& args, const DukValue& callback)
@@ -348,10 +327,10 @@ namespace OpenRCT2::Scripting
             auto ctx = scriptEngine.GetContext();
             try
             {
-                auto action = scriptEngine.CreateGameAction(actionid, args);
+                auto plugin = scriptEngine.GetExecInfo().GetCurrentPlugin();
+                auto action = scriptEngine.CreateGameAction(actionid, args, plugin->GetMetadata().Name);
                 if (action != nullptr)
                 {
-                    auto plugin = scriptEngine.GetExecInfo().GetCurrentPlugin();
                     if (isExecute)
                     {
                         action->SetCallback(
@@ -467,6 +446,7 @@ namespace OpenRCT2::Scripting
             dukglue_register_property(ctx, &ScContext::sharedStorage_get, nullptr, "sharedStorage");
             dukglue_register_method(ctx, &ScContext::getParkStorage, "getParkStorage");
             dukglue_register_property(ctx, &ScContext::mode_get, nullptr, "mode");
+            dukglue_register_property(ctx, &ScContext::paused_get, &ScContext::paused_set, "paused");
             dukglue_register_method(ctx, &ScContext::captureImage, "captureImage");
             dukglue_register_method(ctx, &ScContext::getObject, "getObject");
             dukglue_register_method(ctx, &ScContext::getAllObjects, "getAllObjects");
@@ -492,7 +472,7 @@ namespace OpenRCT2::Scripting
         if (d.type() == DukValue::Type::NUMBER)
         {
             img = d.as_uint();
-            if (GetTargetAPIVersion() <= API_VERSION_63_G2_REORDER)
+            if (GetTargetAPIVersion() <= kApiVersionG2Reorder)
             {
                 img = NewIconIndex(d.as_uint());
             }

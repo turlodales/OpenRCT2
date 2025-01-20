@@ -1,5 +1,5 @@
 /*****************************************************************************
- * Copyright (c) 2014-2023 OpenRCT2 developers
+ * Copyright (c) 2014-2025 OpenRCT2 developers
  *
  * For a complete list of all authors, please refer to contributors.md
  * Interested in contributing? Visit https://github.com/OpenRCT2/OpenRCT2
@@ -9,12 +9,14 @@
 
 #include "StationObject.h"
 
+#include "../core/Guard.hpp"
 #include "../core/IStream.hpp"
 #include "../core/Json.hpp"
 #include "../core/String.hpp"
 #include "../drawing/Drawing.h"
-#include "../localisation/Localisation.h"
 #include "../world/Banner.h"
+
+using namespace OpenRCT2;
 
 void StationObject::Load()
 {
@@ -40,8 +42,8 @@ void StationObject::Unload()
     UnloadImages();
 
     NameStringId = 0;
-    BaseImageId = ImageIndexUndefined;
-    ShelterImageId = ImageIndexUndefined;
+    BaseImageId = kImageIndexUndefined;
+    ShelterImageId = kImageIndexUndefined;
 }
 
 void StationObject::DrawPreview(DrawPixelInfo& dpi, int32_t width, int32_t height) const

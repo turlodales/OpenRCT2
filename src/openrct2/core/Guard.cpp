@@ -1,5 +1,5 @@
 /*****************************************************************************
- * Copyright (c) 2014-2023 OpenRCT2 developers
+ * Copyright (c) 2014-2025 OpenRCT2 developers
  *
  * For a complete list of all authors, please refer to contributors.md
  * Interested in contributing? Visit https://github.com/OpenRCT2/OpenRCT2
@@ -8,33 +8,25 @@
  *****************************************************************************/
 
 #ifdef _WIN32
-#    include <windows.h>
+    #include <cassert>
+    #include <windows.h>
 #endif
 
 #include "../Version.h"
-#include "../common.h"
 #include "Console.hpp"
 #include "Diagnostics.hpp"
 #include "Guard.hpp"
+#include "String.hpp"
 #include "StringBuilder.h"
 
 #include <cassert>
 #include <cstdarg>
 #include <cstdio>
 #include <cstdlib>
-#include <string>
 
-void openrct2_assert_fwd(bool expression, const char* message, ...)
+namespace OpenRCT2::Guard
 {
-    va_list va;
-    va_start(va, message);
-    Guard::Assert_VA(expression, message, va);
-    va_end(va);
-}
-
-namespace Guard
-{
-    constexpr const utf8* ASSERTION_MESSAGE = "An assertion failed, please report this to the OpenRCT2 developers.";
+    static constexpr const utf8* kAssertionMessage = "An assertion failed, please report this to the OpenRCT2 developers.";
 
     // The default behaviour when an assertion is raised.
     static ASSERT_BEHAVIOUR _assertBehaviour =
@@ -75,14 +67,14 @@ namespace Guard
         if (expression)
             return;
 
-        Console::Error::WriteLine(ASSERTION_MESSAGE);
+        Console::Error::WriteLine(kAssertionMessage);
         Console::Error::WriteLine("Version: %s", gVersionInfoFull);
 
         // This is never freed, but acceptable considering we are about to crash out
         std::string formattedMessage;
         if (message != nullptr)
         {
-            formattedMessage = String::Format_VA(message, args);
+            formattedMessage = String::formatVA(message, args);
             Console::Error::WriteLine(formattedMessage.c_str());
             _lastAssertMessage = std::make_optional(formattedMessage);
         }
@@ -138,7 +130,7 @@ namespace Guard
     [[nodiscard]] static std::wstring CreateDialogAssertMessage(std::string_view formattedMessage)
     {
         StringBuilder sb;
-        sb.Append(ASSERTION_MESSAGE);
+        sb.Append(kAssertionMessage);
         sb.Append("\n\n");
         sb.Append("Version: ");
         sb.Append(gVersionInfoFull);
@@ -147,17 +139,17 @@ namespace Guard
             sb.Append("\n");
             sb.Append(formattedMessage);
         }
-        return String::ToWideChar({ sb.GetBuffer(), sb.GetLength() });
+        return String::toWideChar({ sb.GetBuffer(), sb.GetLength() });
     }
 
     static void ForceCrash()
     {
-#    ifdef USE_BREAKPAD
+    #ifdef USE_BREAKPAD
         // Force a crash that breakpad will handle allowing us to get a dump
         *((void**)0) = 0;
-#    else
+    #else
         assert(false);
-#    endif
+    #endif
     }
 #endif
-} // namespace Guard
+} // namespace OpenRCT2::Guard

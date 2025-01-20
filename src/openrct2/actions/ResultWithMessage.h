@@ -1,5 +1,5 @@
 /*****************************************************************************
- * Copyright (c) 2014-2023 OpenRCT2 developers
+ * Copyright (c) 2014-2025 OpenRCT2 developers
  *
  * For a complete list of all authors, please refer to contributors.md
  * Interested in contributing? Visit https://github.com/OpenRCT2/OpenRCT2
@@ -9,16 +9,15 @@
 
 #pragma once
 
-#include "../common.h"
-#include "../localisation/StringIds.h"
+#include "../localisation/StringIdType.h"
 
 struct ResultWithMessage
 {
     bool Successful{};
-    StringId Message = STR_NONE;
+    StringId Message = kStringIdNone;
 
     bool HasMessage() const
     {
-        return Message != STR_NONE;
+        return Message != kStringIdNone;
     }
 };

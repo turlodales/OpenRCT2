@@ -1,5 +1,5 @@
 /*****************************************************************************
- * Copyright (c) 2014-2023 OpenRCT2 developers
+ * Copyright (c) 2014-2025 OpenRCT2 developers
  *
  * For a complete list of all authors, please refer to contributors.md
  * Interested in contributing? Visit https://github.com/OpenRCT2/OpenRCT2
@@ -24,7 +24,7 @@ private:
     MapRange _range;
     LandBuyRightSetting _setting{ LandBuyRightSetting::Count };
 
-    constexpr static StringId _ErrorTitles[] = {
+    constexpr static StringId kErrorTitles[] = {
         STR_CANT_BUY_LAND,
         STR_CANT_BUY_CONSTRUCTION_RIGHTS_HERE,
     };
@@ -39,10 +39,10 @@ public:
     uint16_t GetActionFlags() const override;
 
     void Serialise(DataSerialiser& stream) override;
-    GameActions::Result Query() const override;
-    GameActions::Result Execute() const override;
+    OpenRCT2::GameActions::Result Query() const override;
+    OpenRCT2::GameActions::Result Execute() const override;
 
 private:
-    GameActions::Result QueryExecute(bool isExecuting) const;
-    GameActions::Result MapBuyLandRightsForTile(const CoordsXY& loc, bool isExecuting) const;
+    OpenRCT2::GameActions::Result QueryExecute(bool isExecuting) const;
+    OpenRCT2::GameActions::Result MapBuyLandRightsForTile(const CoordsXY& loc, bool isExecuting) const;
 };

@@ -19,7 +19,7 @@
 ### Download
 | Latest release                                                                                                        | Latest development build |
 |-----------------------------------------------------------------------------------------------------------------------|--------------------------|
-| [![OpenRCT2.org](https://img.shields.io/badge/master-v0.4.4-green.svg)](https://openrct2.org/downloads/master/latest) | [![OpenRCT2.org](https://img.shields.io/github/last-commit/OpenRCT2/OpenRCT2/develop)](https://openrct2.org/downloads/develop/latest) |
+| [![OpenRCT2.org](https://img.shields.io/badge/master-v0.4.18-green.svg)](https://openrct2.org/downloads/master/latest) | [![OpenRCT2.org](https://img.shields.io/github/last-commit/OpenRCT2/OpenRCT2/develop)](https://openrct2.org/downloads/develop/latest) |
 
 ---
 
@@ -52,9 +52,13 @@ If you want to help translate the game to your language, please stop by the Loca
   - 4.4 - [Graphics](#44-graphics)
   - 4.5 - [Audio](#45-audio)
   - 4.6 - [Scenarios](#46-scenarios)
-- 5 - [Licence](#5-licence)
-- 6 - [More information](#6-more-information)
-- 7 - [Sponsors](#7-sponsors)
+- 5 - [Policies](#5-policies)
+  - 5.1 - [Code of conduct](#51-code-of-conduct)
+  - 5.2 - [Code signing policy](#52-code-signing-policy)
+  - 5.3 - [Privacy policy](#53-privacy-policy)
+- 6 - [Licence](#6-licence)
+- 7 - [More information](#7-more-information)
+- 8 - [Sponsors](#8-sponsors)
 
 ---
 
@@ -68,22 +72,20 @@ RollerCoaster Tycoon 2 was originally written by Chris Sawyer in x86 assembly an
 
 # 2. Downloading the game (pre-built)
 
-OpenRCT2 requires original files of RollerCoaster Tycoon 2 to play. It can be bought at either [Steam](https://store.steampowered.com/app/285330/) or [GOG.com](https://www.gog.com/game/rollercoaster_tycoon_2). If you have the original RollerCoaster Tycoon and its expansion packs, you can [point OpenRCT2 to these](https://github.com/OpenRCT2/OpenRCT2/wiki/Loading-RCT1-scenarios-and-data) in order to play the original scenarios.
+OpenRCT2 requires original files of RollerCoaster Tycoon 2 to play. It can be bought at either [Steam](https://store.steampowered.com/app/285330/RollerCoaster_Tycoon_2_Triple_Thrill_Pack/) or [GOG.com](https://www.gog.com/game/rollercoaster_tycoon_2). If you have the original RollerCoaster Tycoon and its expansion packs, you can [point OpenRCT2 to these](https://github.com/OpenRCT2/OpenRCT2/wiki/Loading-RCT1-scenarios-and-data) in order to play the original scenarios.
 
-[OpenRCT2.org](https://openrct2.org/downloads) offers precompiled builds and installers of the latest master and the develop branch. There is also a cross platform [Launcher](https://github.com/LRFLEW/OpenRCT2Launcher/releases) available that will automatically update your build of the game so that you always have the latest version.
+[Our website](https://openrct2.io/download) offers portable builds and installers with the latest versions of the `master` and `develop` branches. There is also a [launcher](https://openrct2.io/download/launcher) available for Windows and Linux that will automatically update your build of the game so that you always have the latest version.
 
-[Flathub](https://flathub.org/) offers flatpaks for Linux distributions that support this application distribution system:
-* [Latest release](https://flathub.org/apps/details/io.openrct2.OpenRCT2)
+Alternatively to using the launcher, for most Linux distributions, we recommend the [latest Flatpak release](https://flathub.org/apps/details/io.openrct2.OpenRCT2). When downloading from Flathub, you will always receive the latest updates regardless of which Linux distribution you use.
 
-Some Linux distributions offer native packages already. These packages are usually third-party, but we're trying to resolve issues they are facing.
-* ArchLinux: [openrct2-git](https://aur.archlinux.org/packages/openrct2-git) (AUR) and [openrct2](https://archlinux.org/packages/community/x86_64/openrct2/) (Community)
-* Ubuntu PPA: [`develop` branch](https://launchpad.net/~openrct2/+archive/ubuntu/nightly) (nightly builds)
-* openSUSE OBS: [games/openrct2](https://software.opensuse.org/download.html?project=games&package=openrct2)
+Some Linux distributions offer native packages:
+* Arch Linux: [openrct2](https://archlinux.org/packages/extra/x86_64/openrct2/) latest release (`extra` repository) and, alternatively, [openrct2-git](https://aur.archlinux.org/packages/openrct2-git) (AUR)
 * Gentoo (main portage tree): [games-simulation/openrct2](https://packages.gentoo.org/packages/games-simulation/openrct2)
 * NixOS (`nixos-unstable` channel): [openrct2](https://github.com/NixOS/nixpkgs/blob/master/pkgs/games/openrct2/default.nix)
-* Fedora 28 i386/amd64: [openrct2](https://copr.fedorainfracloud.org/coprs/nauticalnexus/openrct2/)
+* openSUSE OBS: [games/openrct2](https://software.opensuse.org/download.html?project=games&package=openrct2)
+* Ubuntu PPA (nightly builds): [`develop` branch](https://launchpad.net/~openrct2/+archive/ubuntu/nightly)
 
-Some \*BSD operating systems offer native packages. These packages are usually third-party, but we're trying to resolve issues they are facing.
+Some \*BSD operating systems offer native packages:
 * FreeBSD: [games/openrct2](https://www.freshports.org/games/openrct2)
 * OpenBSD: [games/openrct2](https://openports.se/games/openrct2)
 
@@ -98,29 +100,16 @@ OpenRCT2 requires original files of RollerCoaster Tycoon 2 to play. It can be bo
 <details>
   <summary>Windows prerequisites</summary>
 
+  There are two toolchain options for building the game on Windows:
+
   - Visual Studio 2022 (Enterprise / Professional / [Community (Free)](https://www.visualstudio.com/vs/community/))
     - Desktop development with C++
-  - MSYS2 MinGW Toolchain. The toolchains with supported dependencies are `mingw-x86_64`, `mingw-xi686`, `ucrt-x86_64`, `clang-x86_64`, and `clang-xi686`, each of these require the `$MINGW_PACKAGE_PREFIX` and `msys` and `clangarm-64` are lacking packages for some dependencies
-    - sdl2 (only for UI client)
-    - freetype (can be disabled)
-    - fontconfig (can be disabled)
-    - libzip (>= 1.0)
-    - libpng (>= 1.2)
-    - speexdsp (only for UI client)
-    - curl (only if building with http support)
-    - nlohmann-json (>= 3.6.0)
-    - openssl (>= 1.0; only if building with multiplayer support)
-    - icu (>= 59.0)
-    - zlib
-    - gl (commonly provided by Mesa or GPU vendors; only for UI client, can be disabled)
-    - cmake
-    - benchmark (optional)
-    - innoextract (optional runtime dependency; used for GOG installer extraction during setup)
-    - libogg
-    - libvorbis
-    - flac
- 
-  See the wiki for [the actual package names used in pacman](https://github.com/OpenRCT2/OpenRCT2/wiki/Building-OpenRCT2-on-MSYS2-MinGW).
+  - MSYS2 MinGW Toolchain
+    - The toolchains with supported dependencies are `mingw-x86_64`, `mingw-xi686`, `ucrt-x86_64`, `clang-x86_64`, and `clang-xi686`. Each of these require the `$MINGW_PACKAGE_PREFIX` set.
+    - Note that `msys` and `clangarm-64` are lacking packages for some dependencies.
+
+  The projects depends on several libraries to be installed. These can be installed automatically using `msbuild` for Visual Studio builds. See section 3.2 for details.
+  For MinGW builds, see the wiki for [the actual package names used in pacman](https://github.com/OpenRCT2/OpenRCT2/wiki/Building-OpenRCT2-on-MSYS2-MinGW).
 </details>
 
 <details>
@@ -135,7 +124,7 @@ OpenRCT2 requires original files of RollerCoaster Tycoon 2 to play. It can be bo
 <details>
   <summary>Linux prerequisites</summary>
 
-  - gcc (>= 7.1) or clang (>= 8.0.0) (for C++17 support)
+  - gcc (>= 8.0) or clang (>= 10.0) (for C++20 support)
   - sdl2 (only for UI client)
   - freetype (can be disabled)
   - fontconfig (can be disabled)
@@ -143,7 +132,7 @@ OpenRCT2 requires original files of RollerCoaster Tycoon 2 to play. It can be bo
   - libpng (>= 1.2)
   - speexdsp (only for UI client)
   - curl (only if building with http support)
-  - nlohmann-json (>= 3.6.0)
+  - nlohmann-json (>= 3.9.0)
   - openssl (>= 1.0; only if building with multiplayer support)
   - icu (>= 59.0)
   - zlib
@@ -165,12 +154,14 @@ OpenRCT2 requires original files of RollerCoaster Tycoon 2 to play. It can be bo
   1. Check out the repository, this can be done using [GitHub Desktop](https://desktop.github.com) or [other tools](https://help.github.com/articles/which-remote-url-should-i-use)
   2. Open a new Developer Command Prompt for VS 2022
   3. Navigate to the repository (e.g. `cd C:\GitHub\OpenRCT2`)
-  4. To build the 64-bit version, use `msbuild openrct2.proj /t:build /p:platform=x64`
-
-     To build the 32-bit version, use `msbuild openrct2.proj /t:build /p:platform=Win32`
+  4. To build the x64 version, use `msbuild openrct2.proj /t:build /p:platform=x64`
+     To build the x86 version, use `msbuild openrct2.proj /t:build /p:platform=Win32`
+     To build the Arm64 version, use `msbuild openrct2.proj /t:build /p:platform=arm64`
+   
+     **Note:** The file `g2.dat` may not be generated on cross-compilation (e.g. building for Arm64 on a x64 machine). In this case `g2.dat` must be copied from a x86/x64 build.
   5. Run the game, `bin\openrct2`
 
-  Once you have ran msbuild once, further development can be done within Visual Studio by opening `openrct2.sln`. Make sure to select the correct target platform for which you ran the build in point #3 (`Win32` for the 32-bit version, `x64` for the 64-bit version), otherwise the build will fail in Visual Studio.
+  Once you have ran msbuild once, further development can be done within Visual Studio by opening `openrct2.sln`. Make sure to select the correct target platform for which you ran the build in point #3 (`Win32` for the x86 version, `x64` for the x64 version, `arm64` for the Arm64 version), otherwise the build will fail in Visual Studio.
 
   Other examples:
   ```
@@ -235,7 +226,7 @@ OpenRCT2 requires original files of RollerCoaster Tycoon 2 to play. It can be bo
 ---
 
 # 4. Contributing
-OpenRCT2 uses the [gitflow workflow](https://www.atlassian.com/git/tutorials/comparing-workflows#gitflow-workflow). If you are implementing a new feature or logic from the original game, please branch off and perform pull requests to ```develop```. If you are fixing a bug for the next release, please branch off and perform pull requests to the correct release branch. ```master``` only contains tagged releases, you should never branch off this.
+OpenRCT2 uses the [gitflow workflow](https://www.atlassian.com/git/tutorials/comparing-workflows#gitflow-workflow). If you are implementing a new feature or fixing a bug, please branch off and perform pull requests to ```develop```. ```master``` only contains tagged releases, you should never branch off this.
 
 Please read our [contributing guidelines](https://github.com/OpenRCT2/OpenRCT2/blob/develop/CONTRIBUTING.md) for information.
 
@@ -252,19 +243,39 @@ You can translate the game into other languages by editing the language files in
 You can help create new graphics for the game by visiting the [OpenGraphics project](https://github.com/OpenRCT2/OpenGraphics). 3D modellers needed!
 
 ## 4.5 Audio
-You can help create the music and sound effects for the game. Check out the OpenMusic repository and drop by our [#open-sound-and-music channel on Discord](https://discord.gg/9y8WbcX) to find out more.
+You can help create the music and sound effects for the game. Check out the [OpenMusic](https://github.com/OpenRCT2/OpenMusic) repository and drop by our [#open-sound-and-music channel on Discord](https://discord.gg/9y8WbcX) to find out more.
 
 ## 4.6 Scenarios
 We would also like to distribute additional scenarios with the game, when the time comes. For that, we need talented scenario makers! Check out the [OpenScenarios repository](https://github.com/PFCKrutonium/OpenRCT2-OpenScenarios).
 
 ---
 
-# 5. Licence
-**OpenRCT2** is licensed under the GNU General Public License version 3.
+# 5. Policies
+
+## 5.1 Code of Conduct
+
+We have a [Code of Conduct](CODE_OF_CONDUCT.md) that applies to all OpenRCT2 projects. Please read it.
+
+## 5.2 Code signing policy
+
+We sign our releases with a digital certificate provided by SignPath Foundation.
+
+Free code signing provided by [SignPath.io](https://about.signpath.io/), certificate by [SignPath Foundation](https://signpath.org/).
+
+Signed releases can only be done by member of the [development team](https://github.com/OpenRCT2/OpenRCT2/blob/develop/contributors.md#development-team).
+
+## 5.3 Privacy policy
+
+See [PRIVACY.md](PRIVACY.md) for more information.
 
 ---
 
-# 6. More information
+# 6. Licence
+**OpenRCT2** is licensed under the GNU General Public License version 3 or (at your option) any later version. See the [`licence.txt`](licence.txt) file for more details.
+
+---
+
+# 7. More information
 - [GitHub](https://github.com/OpenRCT2/OpenRCT2)
 - [OpenRCT2.org](https://openrct2.org)
 - [Forums](https://openrct2.org/forums/)
@@ -279,11 +290,11 @@ We would also like to distribute additional scenarios with the game, when the ti
 | [![icon_x128](https://user-images.githubusercontent.com/604665/53047651-2c533c00-3493-11e9-911a-1a3540fc1156.png)](https://github.com/OpenLoco/OpenLoco) | [![](https://github.com/OpenTTD/OpenTTD/raw/850d05d24d4768c81d97765204ef2a487dd4972c/media/openttd.128.png)](https://github.com/OpenTTD/OpenTTD) | [![](https://user-images.githubusercontent.com/550290/36507534-4693f354-175a-11e8-93a7-faa0481474fb.png)](https://github.com/SFTtech/openage) | [![](https://raw.githubusercontent.com/OpenRA/OpenRA/bleed/packaging/artwork/ra_128x128.png)](https://github.com/OpenRA/OpenRA) |
 | Chris Sawyer's Locomotion | Transport Tycoon Deluxe | Age of Empires 2 | Red Alert |
 
-# 7. Sponsors
+# 8. Sponsors
 
 Companies that kindly allow us to use their stuff:
 
-| [DigitalOcean](https://www.digitalocean.com/) | [JetBrains](https://www.jetbrains.com/) | [Backtrace](https://backtrace.io/) |
-|-------------------------------------------------------------------------------------------------------------------------------------------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------|
-| [![do_logo_vertical_blue svg](https://user-images.githubusercontent.com/550290/36508276-8b572f0e-175c-11e8-8622-9febbce756b2.png)](https://www.digitalocean.com/) | [![jetbrains](https://user-images.githubusercontent.com/550290/36413299-0e0985ea-161e-11e8-8a01-3ef523b5905b.png)](https://www.jetbrains.com/) | [![backtrace](https://user-images.githubusercontent.com/550290/47113259-d0647680-d258-11e8-97c3-1a2c6bde6d11.png)](https://backtrace.io/) |
-| Hosting of various services | CLion and other products | Minidump uploads and inspection |
+| [DigitalOcean](https://www.digitalocean.com/)                                                                                                                     | [JetBrains](https://www.jetbrains.com/)                                                                                                        | [Backtrace](https://backtrace.io/)                                                                                                        | [SignPath](https://signpath.org/)                                                                                  |
+|-------------------------------------------------------------------------------------------------------------------------------------------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------|--------------------------------------------------------------------------------------------------------------------|
+| [![do_logo_vertical_blue svg](https://user-images.githubusercontent.com/550290/36508276-8b572f0e-175c-11e8-8622-9febbce756b2.png)](https://www.digitalocean.com/) | [![jetbrains](https://user-images.githubusercontent.com/550290/36413299-0e0985ea-161e-11e8-8a01-3ef523b5905b.png)](https://www.jetbrains.com/) | [![backtrace](https://user-images.githubusercontent.com/550290/47113259-d0647680-d258-11e8-97c3-1a2c6bde6d11.png)](https://backtrace.io/) | [![Image](https://github.com/user-attachments/assets/2b5679e0-76a4-4ae7-bb37-a6a507a53466)](https://signpath.org/) |
+| Hosting of various services                                                                                                                                       | CLion and other products                                                                                                                       | Minidump uploads and inspection                                                                                                           | Free code signing provided by [SignPath.io](https://about.signpath.io/), certificate by [SignPath Foundation](https://signpath.org/).                                                                                                       |

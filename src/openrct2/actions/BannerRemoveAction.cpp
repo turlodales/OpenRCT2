@@ -1,5 +1,5 @@
 /*****************************************************************************
- * Copyright (c) 2014-2023 OpenRCT2 developers
+ * Copyright (c) 2014-2025 OpenRCT2 developers
  *
  * For a complete list of all authors, please refer to contributors.md
  * Interested in contributing? Visit https://github.com/OpenRCT2/OpenRCT2
@@ -9,6 +9,7 @@
 
 #include "BannerRemoveAction.h"
 
+#include "../Diagnostic.h"
 #include "../management/Finance.h"
 #include "../object/BannerSceneryEntry.h"
 #include "../object/ObjectEntryManager.h"
@@ -16,6 +17,7 @@
 #include "../world/MapAnimation.h"
 #include "../world/Scenery.h"
 #include "../world/TileElementsView.h"
+#include "../world/tile_element/BannerElement.h"
 #include "GameAction.h"
 
 using namespace OpenRCT2;
@@ -51,7 +53,11 @@ GameActions::Result BannerRemoveAction::Query() const
     res.Position.z = _loc.z;
     res.ErrorTitle = STR_CANT_REMOVE_THIS;
 
-    if (!LocationValid(_loc) || !MapCanBuildAt({ _loc.x, _loc.y, _loc.z - 16 }))
+    if (!LocationValid(_loc))
+    {
+        return GameActions::Result(GameActions::Status::InvalidParameters, STR_CANT_REMOVE_THIS, STR_OFF_EDGE_OF_MAP);
+    }
+    if (!MapCanBuildAt({ _loc.x, _loc.y, _loc.z - 16 }))
     {
         return GameActions::Result(GameActions::Status::NotOwned, STR_CANT_REMOVE_THIS, STR_LAND_NOT_OWNED_BY_PARK);
     }
@@ -60,21 +66,21 @@ GameActions::Result BannerRemoveAction::Query() const
     if (bannerElement == nullptr)
     {
         LOG_ERROR("Invalid banner location, x = %d, y = %d, z = %d, direction = %d", _loc.x, _loc.y, _loc.z, _loc.direction);
-        return GameActions::Result(GameActions::Status::InvalidParameters, STR_CANT_REMOVE_THIS, STR_NONE);
+        return GameActions::Result(GameActions::Status::InvalidParameters, STR_CANT_REMOVE_THIS, kStringIdNone);
     }
 
     auto bannerIndex = bannerElement->GetIndex();
     if (bannerIndex == BannerIndex::GetNull())
     {
-        LOG_ERROR("Invalid banner index. index = ", bannerIndex);
-        return GameActions::Result(GameActions::Status::InvalidParameters, STR_CANT_REMOVE_THIS, STR_NONE);
+        LOG_ERROR("Invalid banner index %u", bannerIndex);
+        return GameActions::Result(GameActions::Status::InvalidParameters, STR_CANT_REMOVE_THIS, kStringIdNone);
     }
 
     auto banner = bannerElement->GetBanner();
     if (banner == nullptr)
     {
-        LOG_ERROR("Invalid banner index. index = ", bannerIndex);
-        return GameActions::Result(GameActions::Status::InvalidParameters, STR_CANT_REMOVE_THIS, STR_NONE);
+        LOG_ERROR("Invalid banner index %u", bannerIndex);
+        return GameActions::Result(GameActions::Status::InvalidParameters, STR_CANT_REMOVE_THIS, kStringIdNone);
     }
 
     auto* bannerEntry = OpenRCT2::ObjectManager::GetObjectEntry<BannerSceneryEntry>(banner->type);
@@ -99,21 +105,21 @@ GameActions::Result BannerRemoveAction::Execute() const
     if (bannerElement == nullptr)
     {
         LOG_ERROR("Invalid banner location, x = %d, y = %d, z = %d, direction = %d", _loc.x, _loc.y, _loc.z, _loc.direction);
-        return GameActions::Result(GameActions::Status::InvalidParameters, STR_CANT_REMOVE_THIS, STR_NONE);
+        return GameActions::Result(GameActions::Status::InvalidParameters, STR_CANT_REMOVE_THIS, kStringIdNone);
     }
 
     auto bannerIndex = bannerElement->GetIndex();
     if (bannerIndex == BannerIndex::GetNull())
     {
-        LOG_ERROR("Invalid banner index. index = ", bannerIndex);
-        return GameActions::Result(GameActions::Status::InvalidParameters, STR_CANT_REMOVE_THIS, STR_NONE);
+        LOG_ERROR("Invalid banner index %u", bannerIndex);
+        return GameActions::Result(GameActions::Status::InvalidParameters, STR_CANT_REMOVE_THIS, kStringIdNone);
     }
 
     auto banner = bannerElement->GetBanner();
     if (banner == nullptr)
     {
-        LOG_ERROR("Invalid banner index. index = ", bannerIndex);
-        return GameActions::Result(GameActions::Status::InvalidParameters, STR_CANT_REMOVE_THIS, STR_NONE);
+        LOG_ERROR("Invalid banner index %u", bannerIndex);
+        return GameActions::Result(GameActions::Status::InvalidParameters, STR_CANT_REMOVE_THIS, kStringIdNone);
     }
 
     auto* bannerEntry = OpenRCT2::ObjectManager::GetObjectEntry<BannerSceneryEntry>(banner->type);

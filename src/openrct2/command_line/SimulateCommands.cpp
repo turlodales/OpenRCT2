@@ -1,5 +1,5 @@
 /*****************************************************************************
- * Copyright (c) 2014-2023 OpenRCT2 developers
+ * Copyright (c) 2014-2025 OpenRCT2 developers
  *
  * For a complete list of all authors, please refer to contributors.md
  * Interested in contributing? Visit https://github.com/OpenRCT2/OpenRCT2
@@ -11,6 +11,7 @@
 #include "../Game.h"
 #include "../GameState.h"
 #include "../OpenRCT2.h"
+#include "../config/ConfigTypes.h"
 #include "../core/Console.hpp"
 #include "../entity/EntityRegistry.h"
 #include "../network/network.h"
@@ -25,7 +26,8 @@ using namespace OpenRCT2;
 static exitcode_t HandleSimulate(CommandLineArgEnumerator* argEnumerator);
 
 const CommandLineCommand CommandLine::SimulateCommands[]{ // Main commands
-                                                          DefineCommand("", "<ticks>", nullptr, HandleSimulate), CommandTableEnd
+                                                          DefineCommand("", "<ticks>", nullptr, HandleSimulate),
+                                                          kCommandTableEnd
 };
 
 static exitcode_t HandleSimulate(CommandLineArgEnumerator* argEnumerator)
@@ -38,8 +40,6 @@ static exitcode_t HandleSimulate(CommandLineArgEnumerator* argEnumerator)
         Console::Error::WriteLine("Missing arguments <sv6-file> <ticks>.");
         return EXITCODE_FAIL;
     }
-
-    Platform::CoreInit();
 
     const char* inputPath = argv[0];
     uint32_t ticks = atol(argv[1]);
@@ -61,7 +61,7 @@ static exitcode_t HandleSimulate(CommandLineArgEnumerator* argEnumerator)
         Console::WriteLine("Running %d ticks...", ticks);
         for (uint32_t i = 0; i < ticks; i++)
         {
-            context->GetGameState()->UpdateLogic();
+            gameStateUpdateLogic();
         }
         Console::WriteLine("Completed: %s", GetAllEntitiesChecksum().ToString().c_str());
     }

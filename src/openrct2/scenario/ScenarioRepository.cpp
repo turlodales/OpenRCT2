@@ -1,5 +1,5 @@
 /*****************************************************************************
- * Copyright (c) 2014-2023 OpenRCT2 developers
+ * Copyright (c) 2014-2025 OpenRCT2 developers
  *
  * For a complete list of all authors, please refer to contributors.md
  * Interested in contributing? Visit https://github.com/OpenRCT2/OpenRCT2
@@ -10,6 +10,7 @@
 #include "ScenarioRepository.h"
 
 #include "../Context.h"
+#include "../Diagnostic.h"
 #include "../Game.h"
 #include "../ParkImporter.h"
 #include "../PlatformEnvironment.h"
@@ -22,16 +23,15 @@
 #include "../core/Numerics.hpp"
 #include "../core/Path.hpp"
 #include "../core/String.hpp"
-#include "../localisation/Language.h"
-#include "../localisation/Localisation.h"
 #include "../localisation/LocalisationService.h"
 #include "../platform/Platform.h"
+#include "../rct12/CSStringConverter.h"
 #include "../rct12/RCT12.h"
 #include "../rct12/SawyerChunkReader.h"
+#include "../rct2/RCT2.h"
 #include "Scenario.h"
 #include "ScenarioSources.h"
 
-#include <algorithm>
 #include <memory>
 #include <string>
 #include <vector>
@@ -117,7 +117,7 @@ static int32_t ScenarioIndexEntryCompareByIndex(const ScenarioIndexEntry& entryA
 
 static void ScenarioHighscoreFree(ScenarioHighscoreEntry* highscore)
 {
-    SafeDelete(highscore);
+    delete highscore;
 }
 
 class ScenarioFileIndex final : public FileIndex<ScenarioIndexEntry>
@@ -130,12 +130,12 @@ private:
 public:
     explicit ScenarioFileIndex(const IPlatformEnvironment& env)
         : FileIndex(
-            "scenario index", MAGIC_NUMBER, VERSION, env.GetFilePath(PATHID::CACHE_SCENARIOS), std::string(PATTERN),
-            std::vector<std::string>({
-                env.GetDirectoryPath(DIRBASE::RCT1, DIRID::SCENARIO),
-                env.GetDirectoryPath(DIRBASE::RCT2, DIRID::SCENARIO),
-                env.GetDirectoryPath(DIRBASE::USER, DIRID::SCENARIO),
-            }))
+              "scenario index", MAGIC_NUMBER, VERSION, env.GetFilePath(PATHID::CACHE_SCENARIOS), std::string(PATTERN),
+              std::vector<std::string>({
+                  env.GetDirectoryPath(DIRBASE::RCT1, DIRID::SCENARIO),
+                  env.GetDirectoryPath(DIRBASE::RCT2, DIRID::SCENARIO),
+                  env.GetDirectoryPath(DIRBASE::USER, DIRID::SCENARIO),
+              }))
     {
     }
 
@@ -155,6 +155,15 @@ protected:
     void Serialise(DataSerialiser& ds, const ScenarioIndexEntry& item) const override
     {
         ds << item.Path;
+        if (ds.IsLoading())
+        {
+            // Field used to be fixed size length, remove the 0 padding.
+            const auto pos = item.Path.find('\0');
+            if (pos != std::string::npos)
+            {
+                const_cast<ScenarioIndexEntry&>(item).Path = item.Path.substr(0, pos);
+            }
+        }
         ds << item.Timestamp;
         ds << item.Category;
         ds << item.SourceGame;
@@ -173,7 +182,7 @@ protected:
 private:
     static std::unique_ptr<IStream> GetStreamFromRCT2Scenario(const std::string& path)
     {
-        if (String::Equals(Path::GetExtension(path), ".sea", true))
+        if (String::iequals(Path::GetExtension(path), ".sea"))
         {
             auto data = DecryptSea(fs::u8path(path));
             auto ms = std::make_unique<MemoryStream>();
@@ -195,134 +204,45 @@ private:
         LOG_VERBOSE("GetScenarioInfo(%s, %d, ...)", path.c_str(), timestamp);
         try
         {
+            auto& objRepository = OpenRCT2::GetContext()->GetObjectRepository();
+            std::unique_ptr<IParkImporter> importer;
             std::string extension = Path::GetExtension(path);
-            if (String::Equals(extension, ".park", true))
+
+            if (String::iequals(extension, ".park"))
             {
-                // OpenRCT2 park
-                bool result = false;
-                try
-                {
-                    auto& objRepository = OpenRCT2::GetContext()->GetObjectRepository();
-                    auto importer = ParkImporter::CreateParkFile(objRepository);
-                    importer->LoadScenario(path.c_str(), true);
-                    if (importer->GetDetails(entry))
-                    {
-                        String::Set(entry->Path, sizeof(entry->Path), path.c_str());
-                        entry->Timestamp = timestamp;
-                        result = true;
-                    }
-                }
-                catch (const std::exception&)
-                {
-                }
-                return result;
+                importer = ParkImporter::CreateParkFile(objRepository);
+                importer->LoadScenario(path, true);
+            }
+            else if (String::iequals(extension, ".sc4"))
+            {
+                importer = ParkImporter::CreateS4();
+                importer->LoadScenario(path, true);
+            }
+            else
+            {
+                importer = ParkImporter::CreateS6(objRepository);
+                auto stream = GetStreamFromRCT2Scenario(path);
+                importer->LoadFromStream(stream.get(), true);
             }
 
-            if (String::Equals(extension, ".sc4", true))
+            if (importer)
             {
-                // RCT1 scenario
-                bool result = false;
-                try
+                if (importer->GetDetails(entry))
                 {
-                    auto s4Importer = ParkImporter::CreateS4();
-                    s4Importer->LoadScenario(path.c_str(), true);
-                    if (s4Importer->GetDetails(entry))
-                    {
-                        String::Set(entry->Path, sizeof(entry->Path), path.c_str());
-                        entry->Timestamp = timestamp;
-                        result = true;
-                    }
+                    entry->Path = path;
+                    entry->Timestamp = timestamp;
+                    return true;
                 }
-                catch (const std::exception&)
-                {
-                }
-                return result;
-            }
-
-            // RCT2 or RCTC scenario
-            auto stream = GetStreamFromRCT2Scenario(path);
-            auto chunkReader = SawyerChunkReader(stream.get());
-
-            const auto header = chunkReader.ReadChunkAs<RCT2::S6Header>();
-            if (header.Type == S6_TYPE_SCENARIO)
-            {
-                auto info = chunkReader.ReadChunkAs<RCT2::S6Info>();
-                // If the name or the details contain a colour code, they might be in UTF-8 already.
-                // This is caused by a bug that was in OpenRCT2 for 3 years.
-                if (!IsLikelyUTF8(info.Name) && !IsLikelyUTF8(info.Details))
-                {
-                    RCT2StringToUTF8Self(info.Name, sizeof(info.Name));
-                    RCT2StringToUTF8Self(info.Details, sizeof(info.Details));
-                }
-
-                *entry = CreateNewScenarioEntry(path, timestamp, &info);
-                return true;
             }
 
             LOG_VERBOSE("%s is not a scenario", path.c_str());
+            return false;
         }
         catch (const std::exception&)
         {
             Console::Error::WriteLine("Unable to read scenario: '%s'", path.c_str());
         }
         return false;
-    }
-
-    static ScenarioIndexEntry CreateNewScenarioEntry(const std::string& path, uint64_t timestamp, RCT2::S6Info* s6Info)
-    {
-        ScenarioIndexEntry entry = {};
-
-        // Set new entry
-        String::Set(entry.Path, sizeof(entry.Path), path.c_str());
-        entry.Timestamp = timestamp;
-        entry.Category = s6Info->Category;
-        entry.ObjectiveType = s6Info->ObjectiveType;
-        entry.ObjectiveArg1 = s6Info->ObjectiveArg1;
-        entry.ObjectiveArg2 = s6Info->ObjectiveArg2;
-        entry.ObjectiveArg3 = s6Info->ObjectiveArg3;
-        entry.Highscore = nullptr;
-        if (String::IsNullOrEmpty(s6Info->Name))
-        {
-            // If the scenario doesn't have a name, set it to the filename
-            String::Set(entry.Name, sizeof(entry.Name), Path::GetFileNameWithoutExtension(entry.Path).c_str());
-        }
-        else
-        {
-            String::Set(entry.Name, sizeof(entry.Name), s6Info->Name);
-            // Normalise the name to make the scenario as recognisable as possible.
-            ScenarioSources::NormaliseName(entry.Name, sizeof(entry.Name), entry.Name);
-        }
-
-        // entry.name will be translated later so keep the untranslated name here
-        String::Set(entry.InternalName, sizeof(entry.InternalName), entry.Name);
-
-        String::Set(entry.Details, sizeof(entry.Details), s6Info->Details);
-
-        // Look up and store information regarding the origins of this scenario.
-        SourceDescriptor desc;
-        if (ScenarioSources::TryGetByName(entry.Name, &desc))
-        {
-            entry.ScenarioId = desc.id;
-            entry.SourceIndex = desc.index;
-            entry.SourceGame = ScenarioSource{ desc.source };
-            entry.Category = desc.category;
-        }
-        else
-        {
-            entry.ScenarioId = SC_UNIDENTIFIED;
-            entry.SourceIndex = -1;
-            if (entry.Category == SCENARIO_CATEGORY_REAL)
-            {
-                entry.SourceGame = ScenarioSource::Real;
-            }
-            else
-            {
-                entry.SourceGame = ScenarioSource::Other;
-            }
-        }
-
-        ScenarioTranslate(&entry);
-        return entry;
     }
 };
 
@@ -389,7 +309,7 @@ public:
             const auto scenarioFilename = Path::GetFileName(scenario.Path);
 
             // Note: this is always case insensitive search for cross platform consistency
-            if (String::Equals(filename, scenarioFilename, true))
+            if (String::iequals(filename, scenarioFilename))
             {
                 return &scenario;
             }
@@ -407,7 +327,7 @@ public:
                 continue;
 
             // Note: this is always case insensitive search for cross platform consistency
-            if (String::Equals(name, scenario->InternalName, true))
+            if (String::iequals(name, scenario->InternalName))
             {
                 return &_scenarios[i];
             }
@@ -441,18 +361,19 @@ public:
             const std::string scenarioExtension = Path::GetExtension(scenarioFileName);
 
             // Check if this is an RCTC scenario that corresponds to a known RCT1/2 scenario or vice versa, see #12626
-            if (String::Equals(scenarioExtension, ".sea", true))
+            if (String::iequals(scenarioExtension, ".sea"))
             {
                 // Get scenario using RCT2 style name of RCTC scenario
                 scenario = GetByFilename((scenarioBaseName + ".sc6").c_str());
             }
-            else if (String::Equals(scenarioExtension, ".sc6", true))
+            else if (String::iequals(scenarioExtension, ".sc6"))
             {
                 // Get scenario using RCTC style name of RCT2 scenario
                 scenario = GetByFilename((scenarioBaseName + ".sea").c_str());
             }
-            // gScenarioFileName .Park scenarios is the full file path instead of just <scenarioName.park>, so need to convert
-            else if (String::Equals(scenarioExtension, ".park", true))
+            // GameState_t::ScenarioFileName .Park scenarios is the full file path instead of just <scenarioName.park>, so need
+            // to convert
+            else if (String::iequals(scenarioExtension, ".park"))
             {
                 scenario = GetByFilename((scenarioBaseName + ".park").c_str());
             }
@@ -496,7 +417,7 @@ private:
             const auto scenarioFilename = Path::GetFileName(scenario.Path);
 
             // Note: this is always case insensitive search for cross platform consistency
-            if (String::Equals(filename, scenarioFilename, true))
+            if (String::iequals(filename, scenarioFilename))
             {
                 return &scenario;
             }
@@ -536,8 +457,7 @@ private:
      */
     void ConvertMegaPark(const std::string& srcPath, const std::string& dstPath)
     {
-        auto directory = Path::GetDirectory(dstPath);
-        Platform::EnsureDirectoryExists(directory.c_str());
+        Path::CreateDirectory(Path::GetDirectory(dstPath));
 
         auto mpdat = File::ReadAllBytes(srcPath);
 
@@ -554,7 +474,7 @@ private:
     {
         auto filename = Path::GetFileName(entry.Path);
 
-        if (!String::Equals(filename, ""))
+        if (!String::equals(filename, ""))
         {
             auto existingEntry = GetByFilename(filename.c_str());
             if (existingEntry != nullptr)
@@ -563,7 +483,7 @@ private:
                 if (existingEntry->Timestamp > entry.Timestamp)
                 {
                     // Existing entry is more recent
-                    conflictPath = String::ToStd(existingEntry->Path);
+                    conflictPath = existingEntry->Path;
 
                     // Overwrite existing entry with this one
                     *existingEntry = entry;
@@ -588,7 +508,7 @@ private:
 
     void Sort()
     {
-        if (gConfigGeneral.ScenarioSelectMode == SCENARIO_SELECT_MODE_ORIGIN)
+        if (Config::Get().general.ScenarioSelectMode == SCENARIO_SELECT_MODE_ORIGIN)
         {
             std::sort(
                 _scenarios.begin(), _scenarios.end(), [](const ScenarioIndexEntry& a, const ScenarioIndexEntry& b) -> bool {
@@ -682,7 +602,7 @@ private:
                     bool notFound = true;
                     for (auto& highscore : _highscores)
                     {
-                        if (String::Equals(scBasic.Path, highscore->fileName, true))
+                        if (String::iequals(scBasic.Path, highscore->fileName))
                         {
                             notFound = false;
 
@@ -692,7 +612,7 @@ private:
                                 std::string name = RCT2StringToUTF8(scBasic.CompletedBy, RCT2LanguageId::EnglishUK);
                                 highscore->name = name;
                                 highscore->company_value = scBasic.CompanyValue;
-                                highscore->timestamp = DATETIME64_MIN;
+                                highscore->timestamp = kDatetime64Min;
                                 break;
                             }
                         }
@@ -704,7 +624,7 @@ private:
                         std::string name = RCT2StringToUTF8(scBasic.CompletedBy, RCT2LanguageId::EnglishUK);
                         highscore->name = name;
                         highscore->company_value = scBasic.CompanyValue;
-                        highscore->timestamp = DATETIME64_MIN;
+                        highscore->timestamp = kDatetime64Min;
                     }
                 }
             }

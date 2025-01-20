@@ -1,5 +1,5 @@
 /*****************************************************************************
- * Copyright (c) 2014-2023 OpenRCT2 developers
+ * Copyright (c) 2014-2025 OpenRCT2 developers
  *
  * For a complete list of all authors, please refer to contributors.md
  * Interested in contributing? Visit https://github.com/OpenRCT2/OpenRCT2
@@ -11,13 +11,12 @@
 
 #ifdef ENABLE_SCRIPTING
 
-#    include "ScWidget.hpp"
+    #include "ScWidget.hpp"
 
-#    include <openrct2/common.h>
-#    include <openrct2/interface/Window.h>
-#    include <openrct2/interface/Window_internal.h>
-#    include <openrct2/localisation/Language.h>
-#    include <openrct2/scripting/Duktape.hpp>
+    #include <openrct2/interface/Window.h>
+    #include <openrct2/interface/Window_internal.h>
+    #include <openrct2/localisation/Language.h>
+    #include <openrct2/scripting/Duktape.hpp>
 
 namespace OpenRCT2::Scripting
 {
@@ -219,11 +218,9 @@ namespace OpenRCT2::Scripting
             auto w = GetWindow();
             if (w != nullptr)
             {
-                WidgetIndex widgetIndex = 0;
-                for (auto widget = w->widgets; widget->type != WindowWidgetType::Last; widget++)
+                for (WidgetIndex widgetIndex = 0; widgetIndex < w->widgets.size(); widgetIndex++)
                 {
                     result.push_back(ScWidget::ToDukValue(ctx, w, widgetIndex));
-                    widgetIndex++;
                 }
             }
             return result;
@@ -238,7 +235,10 @@ namespace OpenRCT2::Scripting
                 result.reserve(std::size(w->colours));
                 for (auto c : w->colours)
                 {
-                    result.push_back(c);
+                    auto colour = c.colour;
+                    if (c.hasFlag(ColourFlag::translucent))
+                        colour |= kLegacyColourFlagTranslucent;
+                    result.push_back(colour);
                 }
             }
             return result;
@@ -250,17 +250,17 @@ namespace OpenRCT2::Scripting
             {
                 for (size_t i = 0; i < std::size(w->colours); i++)
                 {
-                    int32_t c = COLOUR_BLACK;
+                    auto c = ColourWithFlags{ COLOUR_BLACK };
                     if (i < colours.size())
                     {
-                        c = std::clamp<int32_t>(BASE_COLOUR(colours[i]), COLOUR_BLACK, COLOUR_COUNT - 1);
-                        if (colours[i] & COLOUR_FLAG_TRANSLUCENT)
-                        {
-                            c = TRANSLUCENT(c);
-                        }
+                        colour_t colour = colours[i] & ~kLegacyColourFlagTranslucent;
+                        auto isTranslucent = (colours[i] & kLegacyColourFlagTranslucent);
+                        c.colour = std::clamp<colour_t>(colour, COLOUR_BLACK, COLOUR_COUNT - 1);
+                        c.flags = (isTranslucent ? EnumToFlag(ColourFlag::translucent) : 0);
                     }
                     w->colours[i] = c;
                 }
+                w->Invalidate();
             }
         }
 
@@ -305,7 +305,8 @@ namespace OpenRCT2::Scripting
             auto w = GetWindow();
             if (w != nullptr)
             {
-                WindowClose(*w);
+                auto* windowMgr = Ui::GetWindowManager();
+                windowMgr->Close(*w);
             }
         }
 
@@ -326,10 +327,11 @@ namespace OpenRCT2::Scripting
 
         void bringToFront()
         {
-            auto w = GetWindow();
+            auto* w = GetWindow();
             if (w != nullptr)
             {
-                WindowBringToFront(*w);
+                auto* windowMgr = Ui::GetWindowManager();
+                w = windowMgr->BringToFront(*w);
                 w->flags |= WF_WHITE_BORDER_MASK;
             }
         }
@@ -360,7 +362,8 @@ namespace OpenRCT2::Scripting
     private:
         WindowBase* GetWindow() const
         {
-            return WindowFindByNumber(_class, _number);
+            auto* windowMgr = Ui::GetWindowManager();
+            return windowMgr->FindByNumber(_class, _number);
         }
     };
 } // namespace OpenRCT2::Scripting

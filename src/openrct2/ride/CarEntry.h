@@ -1,5 +1,5 @@
 /*****************************************************************************
- * Copyright (c) 2014-2023 OpenRCT2 developers
+ * Copyright (c) 2014-2025 OpenRCT2 developers
  *
  * For a complete list of all authors, please refer to contributors.md
  * Interested in contributing? Visit https://github.com/OpenRCT2/OpenRCT2
@@ -9,8 +9,8 @@
 
 #pragma once
 
+#include "../core/EnumUtils.hpp"
 #include "../entity/Yaw.hpp"
-#include "../util/Util.h"
 #include "../world/Location.hpp"
 
 #include <array>
@@ -50,7 +50,7 @@ enum : uint32_t
     CAR_ENTRY_FLAG_DODGEM_INUSE_LIGHTS = 1
         << 7, // When set the vehicle has an additional frame for when in use. Used only by dodgems.
     CAR_ENTRY_FLAG_ALLOW_DOORS_DEPRECATED = 1 << 8, // Not used any more - every vehicle will now work with doors.
-    CAR_ENTRY_FLAG_ENABLE_TERNARY_COLOUR = 1 << 9,
+    CAR_ENTRY_FLAG_ENABLE_TERTIARY_COLOUR = 1 << 9,
     CAR_ENTRY_FLAG_RECALCULATE_SPRITE_BOUNDS = 1 << 10, // Only used during loading of the objects.
     CAR_ENTRY_FLAG_USE_16_ROTATION_FRAMES = 1
         << 11, // Instead of the default 32 rotation frames. Only used for boat hire and works only for non sloped sprites.
@@ -146,6 +146,9 @@ enum class SpriteGroupType : uint8_t
     Slopes42Banked67,
     Slopes42Banked90,
     Slopes60Banked22,
+    Slopes50Banked45,
+    Slopes50Banked67,
+    Slopes50Banked90,
     Corkscrews,
     RestraintAnimation,
     CurvedLiftHillUp,
@@ -153,18 +156,26 @@ enum class SpriteGroupType : uint8_t
     Count
 };
 
-static const std::string SpriteGroupNames[] = {
-    "slopeFlat",          "slopes12",         "slopes25",           "slopes42",
-    "slopes60",           "slopes75",         "slopes90",           "slopesLoop",
-    "slopeInverted",      "slopes8",          "slopes16",           "slopes50",
-    "flatBanked22",       "flatBanked45",     "flatBanked67",       "flatBanked90",
-    "inlineTwists",       "slopes12Banked22", "slopes8Banked22",    "slopes25Banked22",
-    "slopes8Banked45",    "slopes16Banked22", "slopes16Banked45",   "slopes25Banked45",
-    "slopes12Banked45",   "slopes25Banked67", "slopes25Banked90",   "slopes25InlineTwists",
-    "slopes42Banked22",   "slopes42Banked45", "slopes42Banked67",   "slopes42Banked90",
-    "slopes60Banked22",   "corkscrews",       "restraintAnimation", "curvedLiftHillUp",
-    "curvedLiftHillDown",
-};
+static constexpr const char* SpriteGroupNames[] = { "slopeFlat",        "slopes12",
+                                                    "slopes25",         "slopes42",
+                                                    "slopes60",         "slopes75",
+                                                    "slopes90",         "slopesLoop",
+                                                    "slopeInverted",    "slopes8",
+                                                    "slopes16",         "slopes50",
+                                                    "flatBanked22",     "flatBanked45",
+                                                    "flatBanked67",     "flatBanked90",
+                                                    "inlineTwists",     "slopes12Banked22",
+                                                    "slopes8Banked22",  "slopes25Banked22",
+                                                    "slopes8Banked45",  "slopes16Banked22",
+                                                    "slopes16Banked45", "slopes25Banked45",
+                                                    "slopes12Banked45", "slopes25Banked67",
+                                                    "slopes25Banked90", "slopes25InlineTwists",
+                                                    "slopes42Banked22", "slopes42Banked45",
+                                                    "slopes42Banked67", "slopes42Banked90",
+                                                    "slopes60Banked22", "slopes50Banked45",
+                                                    "slopes50Banked67", "slopes50Banked90",
+                                                    "corkscrews",       "restraintAnimation",
+                                                    "curvedLiftHillUp", "curvedLiftHillDown" };
 static_assert(std::size(SpriteGroupNames) == EnumValue(SpriteGroupType::Count));
 
 struct VehicleSpriteGroup
@@ -226,6 +237,8 @@ struct CarEntry
     bool GroupEnabled(SpriteGroupType rotationType) const;
     uint32_t GroupImageId(SpriteGroupType spriteGroup) const;
     uint32_t SpriteOffset(SpriteGroupType spriteGroup, int32_t imageDirection, uint8_t rankIndex) const;
+
+    bool isVisible() const;
 };
 
 void CarEntrySetImageMaxSizes(CarEntry& carEntry, int32_t numImages);

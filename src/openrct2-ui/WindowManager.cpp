@@ -1,5 +1,5 @@
 /*****************************************************************************
- * Copyright (c) 2014-2023 OpenRCT2 developers
+ * Copyright (c) 2014-2025 OpenRCT2 developers
  *
  * For a complete list of all authors, please refer to contributors.md
  * Interested in contributing? Visit https://github.com/OpenRCT2/OpenRCT2
@@ -10,12 +10,20 @@
 #include "WindowManager.h"
 
 #include "interface/Theme.h"
-#include "windows/Window.h"
+#include "interface/Window.h"
+#include "ride/VehicleSounds.h"
+#include "windows/Windows.h"
 
+#include <openrct2-ui/ProvisionalElements.h>
+#include <openrct2-ui/UiContext.h>
 #include <openrct2-ui/input/InputManager.h>
+#include <openrct2-ui/input/MouseInput.h>
 #include <openrct2-ui/input/ShortcutManager.h>
-#include <openrct2-ui/windows/Window.h>
+#include <openrct2-ui/windows/Windows.h>
+#include <openrct2/Context.h>
+#include <openrct2/GameState.h>
 #include <openrct2/Input.h>
+#include <openrct2/OpenRCT2.h>
 #include <openrct2/config/Config.h>
 #include <openrct2/core/Console.hpp>
 #include <openrct2/core/Guard.hpp>
@@ -23,11 +31,21 @@
 #include <openrct2/interface/Viewport.h>
 #include <openrct2/localisation/Formatter.h>
 #include <openrct2/rct2/T6Exporter.h>
+#include <openrct2/ride/Ride.h>
 #include <openrct2/ride/RideConstruction.h>
 #include <openrct2/ride/Vehicle.h>
+#include <openrct2/ui/UiContext.h>
 #include <openrct2/ui/WindowManager.h>
 
+using namespace OpenRCT2;
 using namespace OpenRCT2::Ui;
+using namespace OpenRCT2::Ui::Windows;
+
+namespace WindowCloseFlags
+{
+    static constexpr uint32_t None = 0;
+    static constexpr uint32_t CloseSingle = (1 << 0);
+} // namespace WindowCloseFlags
 
 class WindowManager final : public IWindowManager
 {
@@ -43,101 +61,105 @@ public:
         switch (wc)
         {
             case WindowClass::About:
-                return WindowAboutOpen();
+                return AboutOpen();
             case WindowClass::BottomToolbar:
-                return WindowGameBottomToolbarOpen();
+                return GameBottomToolbarOpen();
             case WindowClass::Changelog:
                 return OpenView(WV_CHANGELOG);
             case WindowClass::Cheats:
-                return WindowCheatsOpen();
+                return CheatsOpen();
             case WindowClass::ClearScenery:
-                return WindowClearSceneryOpen();
+                return ClearSceneryOpen();
             case WindowClass::CustomCurrencyConfig:
-                return CustomCurrencyWindowOpen();
+                return CustomCurrencyOpen();
             case WindowClass::DebugPaint:
-                return WindowDebugPaintOpen();
+                return DebugPaintOpen();
             case WindowClass::EditorInventionList:
-                return WindowEditorInventionsListOpen();
+                return EditorInventionsListOpen();
             case WindowClass::EditorObjectSelection:
-                return WindowEditorObjectSelectionOpen();
+                return EditorObjectSelectionOpen();
             case WindowClass::EditorObjectiveOptions:
-                return WindowEditorObjectiveOptionsOpen();
+                return EditorObjectiveOptionsOpen();
             case WindowClass::EditorScenarioOptions:
-                return WindowEditorScenarioOptionsOpen();
+                return EditorScenarioOptionsOpen();
             case WindowClass::Finances:
-                return WindowFinancesOpen();
+                return FinancesOpen();
             case WindowClass::Footpath:
-                return WindowFootpathOpen();
+                return FootpathOpen();
             case WindowClass::GuestList:
-                return WindowGuestListOpen();
+                return GuestListOpen();
             case WindowClass::Land:
-                return WindowLandOpen();
+                return LandOpen();
             case WindowClass::LandRights:
-                return WindowLandRightsOpen();
+                return LandRightsOpen();
             case WindowClass::MainWindow:
-                return WindowMainOpen();
+                return MainOpen();
             case WindowClass::Map:
-                return WindowMapOpen();
+                return MapOpen();
             case WindowClass::Mapgen:
-                return WindowMapgenOpen();
+                return MapgenOpen();
             case WindowClass::Multiplayer:
-                return WindowMultiplayerOpen();
+                return MultiplayerOpen();
             case WindowClass::ConstructRide:
-                return WindowNewRideOpen();
+                return NewRideOpen();
             case WindowClass::ParkInformation:
-                return WindowParkEntranceOpen();
+                return ParkEntranceOpen();
             case WindowClass::RecentNews:
-                return WindowNewsOpen();
+                return NewsOpen();
             case WindowClass::RideConstruction:
-                return WindowRideConstructionOpen();
+                return RideConstructionOpen();
             case WindowClass::Research:
-                return WindowResearchOpen();
+                return ResearchOpen();
             case WindowClass::RideList:
-                return WindowRideListOpen();
+                return RideListOpen();
             case WindowClass::NotificationOptions:
-                return WindowNewsOptionsOpen();
+                return NewsOptionsOpen();
             case WindowClass::Options:
-                return WindowOptionsOpen();
+                return OptionsOpen();
             case WindowClass::SavePrompt:
-                return WindowSavePromptOpen();
+                return SavePromptOpen();
             case WindowClass::Scenery:
-                return WindowSceneryOpen();
+                return SceneryOpen();
             case WindowClass::SceneryScatter:
-                return WindowSceneryScatterOpen();
+                return SceneryScatterOpen();
 #ifndef DISABLE_NETWORK
             case WindowClass::ServerList:
-                return WindowServerListOpen();
+                return ServerListOpen();
             case WindowClass::ServerStart:
-                return WindowServerStartOpen();
+                return ServerStartOpen();
 #endif
             case WindowClass::KeyboardShortcutList:
-                return WindowShortcutKeysOpen();
+                return ShortcutKeysOpen();
             case WindowClass::StaffList:
-                return WindowStaffListOpen();
+                return StaffListOpen();
             case WindowClass::Themes:
-                return WindowThemesOpen();
+                return ThemesOpen();
             case WindowClass::TileInspector:
-                return WindowTileInspectorOpen();
+                return TileInspectorOpen();
             case WindowClass::TitleExit:
-                return WindowTitleExitOpen();
+                return TitleExitOpen();
             case WindowClass::TitleLogo:
-                return WindowTitleLogoOpen();
+                return TitleLogoOpen();
             case WindowClass::TitleMenu:
-                return WindowTitleMenuOpen();
+                return TitleMenuOpen();
             case WindowClass::TitleOptions:
-                return WindowTitleOptionsOpen();
+                return TitleOptionsOpen();
+            case WindowClass::TitleVersion:
+                return TitleVersionOpen();
             case WindowClass::TopToolbar:
-                return WindowTopToolbarOpen();
+                return TopToolbarOpen();
             case WindowClass::ViewClipping:
-                return WindowViewClippingOpen();
+                return ViewClippingOpen();
             case WindowClass::Viewport:
-                return WindowViewportOpen();
+                return ViewportOpen();
             case WindowClass::Water:
-                return WindowWaterOpen();
+                return WaterOpen();
             case WindowClass::Transparency:
-                return WindowTransparencyOpen();
+                return TransparencyOpen();
             case WindowClass::AssetPacks:
-                return WindowAssetPacksOpen();
+                return AssetPacksOpen();
+            case WindowClass::EditorParkEntrance:
+                return EditorParkEntranceOpen();
             default:
                 Console::Error::WriteLine("Unhandled window class (%d)", wc);
                 return nullptr;
@@ -149,35 +171,35 @@ public:
         switch (view)
         {
             case WV_PARK_AWARDS:
-                return WindowParkAwardsOpen();
+                return ParkAwardsOpen();
             case WV_PARK_RATING:
-                return WindowParkRatingOpen();
+                return ParkRatingOpen();
             case WV_PARK_OBJECTIVE:
-                return WindowParkObjectiveOpen();
+                return ParkObjectiveOpen();
             case WV_PARK_GUESTS:
-                return WindowParkGuestsOpen();
+                return ParkGuestsOpen();
             case WV_FINANCES_RESEARCH:
-                return WindowFinancesResearchOpen();
+                return FinancesResearchOpen();
             case WV_RIDE_RESEARCH:
-                if (gConfigInterface.ToolbarShowResearch)
+                if (Config::Get().interface.ToolbarShowResearch)
                 {
                     return this->OpenWindow(WindowClass::Research);
                 }
-                return WindowNewRideOpenResearch();
+                return NewRideOpenResearch();
             case WV_MAZE_CONSTRUCTION:
-                return WindowMazeConstructionOpen();
+                return MazeConstructionOpen();
             case WV_NETWORK_PASSWORD:
-                return WindowNetworkStatusOpenPassword();
+                return NetworkStatusOpenPassword();
             case WV_EDITOR_BOTTOM_TOOLBAR:
-                return WindowEditorBottomToolbarOpen();
+                return EditorBottomToolbarOpen();
             case WV_CHANGELOG:
-                return WindowChangelogOpen(WV_CHANGELOG);
+                return ChangelogOpen(WV_CHANGELOG);
             case WV_NEW_VERSION_INFO:
-                return WindowChangelogOpen(WV_NEW_VERSION_INFO);
+                return ChangelogOpen(WV_NEW_VERSION_INFO);
             case WV_CONTRIBUTORS:
-                return WindowChangelogOpen(WV_CONTRIBUTORS);
+                return ChangelogOpen(WV_CONTRIBUTORS);
             case WV_FINANCE_MARKETING:
-                return WindowFinancesMarketingOpen();
+                return FinancesMarketingOpen();
             default:
                 return nullptr;
         }
@@ -188,33 +210,33 @@ public:
         switch (type)
         {
             case WD_BANNER:
-                return WindowBannerOpen(id);
+                return BannerOpen(id);
             case WD_NEW_CAMPAIGN:
-                return WindowNewCampaignOpen(id);
+                return NewCampaignOpen(id);
             case WD_DEMOLISH_RIDE:
-                return WindowRideDemolishPromptOpen(*GetRide(RideId::FromUnderlying(id)));
+                return RideDemolishPromptOpen(*GetRide(RideId::FromUnderlying(id)));
             case WD_REFURBISH_RIDE:
-                return WindowRideRefurbishPromptOpen(*GetRide(RideId::FromUnderlying(id)));
+                return RideRefurbishPromptOpen(*GetRide(RideId::FromUnderlying(id)));
             case WD_SIGN:
-                return WindowSignOpen(id);
+                return SignOpen(id);
             case WD_SIGN_SMALL:
-                return WindowSignSmallOpen(id);
+                return SignSmallOpen(id);
             case WD_PLAYER:
-                return WindowPlayerOpen(id);
+                return PlayerOpen(id);
 
             default:
                 return nullptr;
         }
     }
 
-    WindowBase* ShowError(StringId title, StringId message, const Formatter& args) override
+    WindowBase* ShowError(StringId title, StringId message, const Formatter& args, bool autoClose /* = false */) override
     {
-        return WindowErrorOpen(title, message, args);
+        return ErrorOpen(title, message, args, autoClose);
     }
 
-    WindowBase* ShowError(std::string_view title, std::string_view message) override
+    WindowBase* ShowError(std::string_view title, std::string_view message, bool autoClose /* = false */) override
     {
-        return WindowErrorOpen(title, message);
+        return ErrorOpen(title, message, autoClose);
     }
 
     WindowBase* OpenIntent(Intent* intent) override
@@ -222,23 +244,23 @@ public:
         switch (intent->GetWindowClass())
         {
             case WindowClass::Peep:
-                return WindowGuestOpen(static_cast<Peep*>(intent->GetPointerExtra(INTENT_EXTRA_PEEP)));
+                return GuestOpen(static_cast<Peep*>(intent->GetPointerExtra(INTENT_EXTRA_PEEP)));
             case WindowClass::FirePrompt:
-                return WindowStaffFirePromptOpen(static_cast<Peep*>(intent->GetPointerExtra(INTENT_EXTRA_PEEP)));
+                return StaffFirePromptOpen(static_cast<Peep*>(intent->GetPointerExtra(INTENT_EXTRA_PEEP)));
             case WindowClass::InstallTrack:
-                return WindowInstallTrackOpen(intent->GetStringExtra(INTENT_EXTRA_PATH).c_str());
+                return InstallTrackOpen(intent->GetStringExtra(INTENT_EXTRA_PATH).c_str());
             case WindowClass::GuestList:
-                return WindowGuestListOpenWithFilter(
+                return GuestListOpenWithFilter(
                     static_cast<GuestListFilterType>(intent->GetSIntExtra(INTENT_EXTRA_GUEST_LIST_FILTER)),
                     intent->GetSIntExtra(INTENT_EXTRA_RIDE_ID));
             case WindowClass::Loadsave:
             {
                 uint32_t type = intent->GetUIntExtra(INTENT_EXTRA_LOADSAVE_TYPE);
                 std::string defaultName = intent->GetStringExtra(INTENT_EXTRA_PATH);
-                loadsave_callback callback = reinterpret_cast<loadsave_callback>(
-                    intent->GetPointerExtra(INTENT_EXTRA_CALLBACK));
+                LoadSaveCallback callback = reinterpret_cast<LoadSaveCallback>(
+                    intent->GetCloseCallbackExtra(INTENT_EXTRA_CALLBACK));
                 TrackDesign* trackDesign = static_cast<TrackDesign*>(intent->GetPointerExtra(INTENT_EXTRA_TRACK_DESIGN));
-                auto* w = WindowLoadsaveOpen(
+                auto* w = LoadsaveOpen(
                     type, defaultName,
                     [callback](int32_t result, std::string_view path) {
                         if (callback != nullptr)
@@ -250,20 +272,19 @@ public:
                 return w;
             }
             case WindowClass::ManageTrackDesign:
-                return WindowTrackManageOpen(
-                    static_cast<TrackDesignFileRef*>(intent->GetPointerExtra(INTENT_EXTRA_TRACK_DESIGN)));
+                return TrackManageOpen(static_cast<TrackDesignFileRef*>(intent->GetPointerExtra(INTENT_EXTRA_TRACK_DESIGN)));
             case WindowClass::NetworkStatus:
             {
                 std::string message = intent->GetStringExtra(INTENT_EXTRA_MESSAGE);
-                close_callback callback = intent->GetCloseCallbackExtra(INTENT_EXTRA_CALLBACK);
-                return WindowNetworkStatusOpen(message, callback);
+                CloseCallback callback = intent->GetCloseCallbackExtra(INTENT_EXTRA_CALLBACK);
+                return NetworkStatusOpen(message, callback);
             }
             case WindowClass::ObjectLoadError:
             {
                 std::string path = intent->GetStringExtra(INTENT_EXTRA_PATH);
                 auto objects = static_cast<const ObjectEntryDescriptor*>(intent->GetPointerExtra(INTENT_EXTRA_LIST));
                 size_t count = intent->GetUIntExtra(INTENT_EXTRA_LIST_COUNT);
-                WindowObjectLoadErrorOpen(const_cast<utf8*>(path.c_str()), count, objects);
+                ObjectLoadErrorOpen(const_cast<utf8*>(path.c_str()), count, objects);
 
                 return nullptr;
             }
@@ -271,21 +292,20 @@ public:
             {
                 const auto rideId = RideId::FromUnderlying(intent->GetSIntExtra(INTENT_EXTRA_RIDE_ID));
                 auto ride = GetRide(rideId);
-                return ride == nullptr ? nullptr : WindowRideMainOpen(*ride);
+                return ride == nullptr ? nullptr : RideMainOpen(*ride);
             }
             case WindowClass::TrackDesignPlace:
-                return WindowTrackPlaceOpen(
-                    static_cast<TrackDesignFileRef*>(intent->GetPointerExtra(INTENT_EXTRA_TRACK_DESIGN)));
+                return TrackPlaceOpen(static_cast<TrackDesignFileRef*>(intent->GetPointerExtra(INTENT_EXTRA_TRACK_DESIGN)));
             case WindowClass::TrackDesignList:
             {
                 RideSelection rideItem;
                 rideItem.Type = intent->GetUIntExtra(INTENT_EXTRA_RIDE_TYPE);
                 rideItem.EntryIndex = intent->GetUIntExtra(INTENT_EXTRA_RIDE_ENTRY_INDEX);
-                return WindowTrackListOpen(rideItem);
+                return TrackListOpen(rideItem);
             }
             case WindowClass::ScenarioSelect:
-                return WindowScenarioselectOpen(
-                    reinterpret_cast<scenarioselect_callback>(intent->GetPointerExtra(INTENT_EXTRA_CALLBACK)), false);
+                return ScenarioselectOpen(
+                    reinterpret_cast<ScenarioSelectCallback>(intent->GetCloseCallbackExtra(INTENT_EXTRA_CALLBACK)));
 
             case WindowClass::Null:
                 // Intent does not hold a window class
@@ -301,7 +321,7 @@ public:
             case INTENT_ACTION_NEW_RIDE_OF_TYPE:
             {
                 // Open ride list window
-                auto w = WindowNewRideOpen();
+                auto w = NewRideOpen();
 
                 // Switch to right tab and scroll to ride location
                 RideSelection rideItem;
@@ -314,24 +334,35 @@ public:
             case INTENT_ACTION_NEW_SCENERY:
             {
                 // Check if window is already open
-                auto* window = WindowBringToFrontByClass(WindowClass::Scenery);
+                auto* window = BringToFrontByClass(WindowClass::Scenery);
                 if (window == nullptr)
-                {
-                    auto* tlbrWindow = WindowFindByClass(WindowClass::TopToolbar);
-                    if (tlbrWindow != nullptr)
-                    {
-                        tlbrWindow->Invalidate();
-                        if (!ToolSet(*tlbrWindow, WC_TOP_TOOLBAR__WIDX_SCENERY, Tool::Arrow))
-                        {
-                            InputSetFlag(INPUT_FLAG_6, true);
-                            window = WindowSceneryOpen();
-                        }
-                    }
-                }
+                    ToggleSceneryWindow();
 
                 // Switch to new scenery tab
                 WindowScenerySetSelectedTab(intent->GetUIntExtra(INTENT_EXTRA_SCENERY_GROUP_ENTRY_INDEX));
                 return window;
+            }
+
+            case INTENT_ACTION_PROGRESS_OPEN:
+            {
+                std::string message = intent->GetStringExtra(INTENT_EXTRA_MESSAGE);
+                CloseCallback callback = intent->GetCloseCallbackExtra(INTENT_EXTRA_CALLBACK);
+                return ProgressWindowOpen(message, callback);
+            }
+
+            case INTENT_ACTION_PROGRESS_SET:
+            {
+                uint32_t currentProgress = intent->GetUIntExtra(INTENT_EXTRA_PROGRESS_OFFSET);
+                uint32_t totalCount = intent->GetUIntExtra(INTENT_EXTRA_PROGRESS_TOTAL);
+                StringId format = intent->GetUIntExtra(INTENT_EXTRA_STRING_ID);
+                ProgressWindowSet(currentProgress, totalCount, format);
+                return nullptr;
+            }
+
+            case INTENT_ACTION_PROGRESS_CLOSE:
+            {
+                ProgressWindowClose();
+                return nullptr;
             }
 
             case INTENT_ACTION_NULL:
@@ -346,9 +377,9 @@ public:
         switch (intent->GetWindowDetail())
         {
             case WD_VEHICLE:
-                return WindowRideOpenVehicle(static_cast<Vehicle*>(intent->GetPointerExtra(INTENT_EXTRA_VEHICLE)));
+                return RideOpenVehicle(static_cast<Vehicle*>(intent->GetPointerExtra(INTENT_EXTRA_VEHICLE)));
             case WD_TRACK:
-                return WindowRideOpenTrack(static_cast<TileElement*>(intent->GetPointerExtra(INTENT_EXTRA_TILE_ELEMENT)));
+                return RideOpenTrack(static_cast<TileElement*>(intent->GetPointerExtra(INTENT_EXTRA_TILE_ELEMENT)));
 
             case WD_NULL:
                 // Intent does not hold an window detail
@@ -383,7 +414,7 @@ public:
 
             case INTENT_ACTION_REFRESH_RIDE_LIST:
             {
-                auto window = WindowFindByClass(WindowClass::RideList);
+                auto window = FindByClass(WindowClass::RideList);
                 if (window != nullptr)
                 {
                     WindowRideListRefreshList(window);
@@ -399,10 +430,10 @@ public:
             case INTENT_ACTION_RIDE_CONSTRUCTION_FOCUS:
             {
                 auto rideIndex = intent.GetUIntExtra(INTENT_EXTRA_RIDE_ID);
-                auto w = WindowFindByClass(WindowClass::RideConstruction);
-                if (w == nullptr || w->number != rideIndex)
+                auto w = FindByClass(WindowClass::RideConstruction);
+                if (w == nullptr || w->number != static_cast<int16_t>(rideIndex))
                 {
-                    WindowCloseConstructionWindows();
+                    CloseConstructionWindows();
                     _currentRideIndex = RideId::FromUnderlying(rideIndex);
                     OpenWindow(WindowClass::RideConstruction);
                 }
@@ -455,34 +486,17 @@ public:
             case INTENT_ACTION_INVALIDATE_VEHICLE_WINDOW:
             {
                 auto vehicle = static_cast<Vehicle*>(intent.GetPointerExtra(INTENT_EXTRA_VEHICLE));
-                auto* w = WindowFindByNumber(WindowClass::Ride, vehicle->ride.ToUnderlying());
-                if (w == nullptr)
-                    return;
-
-                auto ride = vehicle->GetRide();
-                auto viewVehicleIndex = w->ride.view - 1;
-                if (ride == nullptr || viewVehicleIndex < 0 || viewVehicleIndex >= ride->NumTrains)
-                    return;
-
-                if (vehicle->Id != ride->vehicles[viewVehicleIndex])
-                    return;
-
-                w->Invalidate();
+                if (vehicle != nullptr)
+                {
+                    WindowRideInvalidateVehicle(*vehicle);
+                }
                 break;
             }
 
             case INTENT_ACTION_RIDE_PAINT_RESET_VEHICLE:
             {
                 auto rideIndex = intent.GetUIntExtra(INTENT_EXTRA_RIDE_ID);
-                auto w = WindowFindByNumber(WindowClass::Ride, rideIndex);
-                if (w != nullptr)
-                {
-                    if (w->page == 4) // WINDOW_RIDE_PAGE_COLOUR
-                    {
-                        w->vehicleIndex = 0;
-                    }
-                    w->Invalidate();
-                }
+                WindowRidePaintResetVehicle(RideId::FromUnderlying(rideIndex));
                 break;
             }
 
@@ -514,9 +528,9 @@ public:
 
             case INTENT_ACTION_UPDATE_BANNER:
             {
-                uint8_t bannerIndex = static_cast<uint8_t>(intent.GetUIntExtra(INTENT_EXTRA_BANNER_INDEX));
+                rct_windownumber bannerIndex = static_cast<rct_windownumber>(intent.GetUIntExtra(INTENT_EXTRA_BANNER_INDEX));
 
-                WindowBase* w = WindowFindByNumber(WindowClass::Banner, bannerIndex);
+                WindowBase* w = FindByNumber(WindowClass::Banner, bannerIndex);
                 if (w != nullptr)
                 {
                     w->Invalidate();
@@ -528,12 +542,8 @@ public:
                 WindowInvalidateByClass(WindowClass::Research);
                 break;
 
-            case INTENT_ACTION_TRACK_DESIGN_REMOVE_PROVISIONAL:
-                TrackPlaceClearProvisionalTemporarily();
-                break;
-
-            case INTENT_ACTION_TRACK_DESIGN_RESTORE_PROVISIONAL:
-                TrackPlaceRestoreProvisional();
+            case INTENT_ACTION_UPDATE_VEHICLE_SOUNDS:
+                OpenRCT2::Audio::UpdateVehicleSounds();
                 break;
 
             case INTENT_ACTION_SET_MAP_TOOLTIP:
@@ -546,6 +556,24 @@ public:
                 break;
             }
 
+            case INTENT_ACTION_TILE_MODIFY:
+            {
+                WindowInvalidateByClass(WindowClass::TileInspector);
+                break;
+            }
+
+            case INTENT_ACTION_REMOVE_PROVISIONAL_ELEMENTS:
+                ProvisionalElementsRemove();
+                break;
+            case INTENT_ACTION_RESTORE_PROVISIONAL_ELEMENTS:
+                ProvisionalElementsRestore();
+                break;
+            case INTENT_ACTION_REMOVE_PROVISIONAL_FOOTPATH:
+                FootpathRemoveProvisional();
+                break;
+            case INTENT_ACTION_REMOVE_PROVISIONAL_TRACK_PIECE:
+                RideRemoveProvisionalTrackPiece();
+                break;
             default:
                 break;
         }
@@ -557,6 +585,10 @@ public:
         {
             case WindowClass::NetworkStatus:
                 WindowNetworkStatusClose();
+                break;
+
+            case WindowClass::ProgressWindow:
+                ProgressWindowClose();
                 break;
 
             default:
@@ -593,20 +625,14 @@ public:
         if (mainWindow != nullptr)
         {
             auto viewport = WindowGetViewport(mainWindow);
-            auto zoomDifference = zoom - viewport->zoom;
 
             mainWindow->viewport_target_sprite = EntityId::GetNull();
             mainWindow->savedViewPos = viewPos;
             viewport->zoom = zoom;
-            gCurrentRotation = rotation;
+            viewport->rotation = rotation;
 
-            if (zoomDifference != ZoomLevel{ 0 })
-            {
-                viewport->view_width = zoomDifference.ApplyTo(viewport->view_width);
-                viewport->view_height = zoomDifference.ApplyTo(viewport->view_height);
-            }
-            mainWindow->savedViewPos.x -= viewport->view_width >> 1;
-            mainWindow->savedViewPos.y -= viewport->view_height >> 1;
+            mainWindow->savedViewPos.x -= viewport->ViewWidth() / 2;
+            mainWindow->savedViewPos.y -= viewport->ViewHeight() / 2;
 
             // Make sure the viewport has correct coordinates set.
             ViewportUpdatePosition(mainWindow);
@@ -630,6 +656,629 @@ public:
             }
         }
         return nullptr;
+    }
+
+    static bool WindowFitsBetweenOthers(const ScreenCoordsXY& loc, int32_t width, int32_t height)
+    {
+        for (auto& w : g_window_list)
+        {
+            if (w->flags & WF_DEAD)
+                continue;
+            if (w->flags & WF_STICK_TO_BACK)
+                continue;
+
+            if (loc.x + width <= w->windowPos.x)
+                continue;
+            if (loc.x >= w->windowPos.x + w->width)
+                continue;
+            if (loc.y + height <= w->windowPos.y)
+                continue;
+            if (loc.y >= w->windowPos.y + w->height)
+                continue;
+            return false;
+        }
+
+        return true;
+    }
+
+    static bool WindowFitsWithinSpace(const ScreenCoordsXY& loc, int32_t width, int32_t height)
+    {
+        if (loc.x < 0)
+            return false;
+        if (loc.y <= kTopToolbarHeight && !(gScreenFlags & SCREEN_FLAGS_TITLE_DEMO))
+            return false;
+        if (loc.x + width > ContextGetWidth())
+            return false;
+        if (loc.y + height > ContextGetHeight())
+            return false;
+        return WindowFitsBetweenOthers(loc, width, height);
+    }
+
+    static bool WindowFitsOnScreen(const ScreenCoordsXY& loc, int32_t width, int32_t height)
+    {
+        uint16_t screenWidth = ContextGetWidth();
+        uint16_t screenHeight = ContextGetHeight();
+        int32_t unk;
+
+        unk = -(width / 4);
+        if (loc.x < unk)
+            return false;
+        unk = screenWidth + (unk * 2);
+        if (loc.x > unk)
+            return false;
+        if (loc.y <= kTopToolbarHeight && !(gScreenFlags & SCREEN_FLAGS_TITLE_DEMO))
+            return false;
+        unk = screenHeight - (height / 4);
+        if (loc.y > unk)
+            return false;
+        return WindowFitsBetweenOthers(loc, width, height);
+    }
+
+    static ScreenCoordsXY ClampWindowToScreen(
+        const ScreenCoordsXY& pos, const int32_t screenWidth, const int32_t screenHeight, const int32_t width,
+        const int32_t height)
+    {
+        auto screenPos = pos;
+        if (width > screenWidth || screenPos.x < 0)
+            screenPos.x = 0;
+        else if (screenPos.x + width > screenWidth)
+            screenPos.x = screenWidth - width;
+
+        auto toolbarAllowance = (gScreenFlags & SCREEN_FLAGS_TITLE_DEMO) ? 0 : (kTopToolbarHeight + 1);
+        if (height - toolbarAllowance > screenHeight || screenPos.y < toolbarAllowance)
+            screenPos.y = toolbarAllowance;
+        else if (screenPos.y + height - toolbarAllowance > screenHeight)
+            screenPos.y = screenHeight + toolbarAllowance - height;
+
+        return screenPos;
+    }
+
+    static ScreenCoordsXY GetAutoPositionForNewWindow(int32_t width, int32_t height)
+    {
+        auto uiContext = GetContext()->GetUiContext();
+        auto screenWidth = uiContext->GetWidth();
+        auto screenHeight = uiContext->GetHeight();
+
+        // Place window in an empty corner of the screen
+        const ScreenCoordsXY cornerPositions[] = {
+            { 0, 30 },                                           // topLeft
+            { screenWidth - width, 30 },                         // topRight
+            { 0, screenHeight - 34 - height },                   // bottomLeft
+            { screenWidth - width, screenHeight - 34 - height }, // bottomRight
+        };
+
+        for (const auto& cornerPos : cornerPositions)
+        {
+            if (WindowFitsWithinSpace(cornerPos, width, height))
+            {
+                return ClampWindowToScreen(cornerPos, screenWidth, screenHeight, width, height);
+            }
+        }
+
+        // Place window next to another
+        for (auto& w : g_window_list)
+        {
+            if (w->flags & WF_DEAD)
+                continue;
+            if (w->flags & WF_STICK_TO_BACK)
+                continue;
+
+            const ScreenCoordsXY offsets[] = {
+                { w->width + 2, 0 },
+                { -w->width - 2, 0 },
+                { 0, w->height + 2 },
+                { 0, -w->height - 2 },
+                { w->width + 2, -w->height - 2 },
+                { -w->width - 2, -w->height - 2 },
+                { w->width + 2, w->height + 2 },
+                { -w->width - 2, w->height + 2 },
+            };
+
+            for (const auto& offset : offsets)
+            {
+                auto screenPos = w->windowPos + offset;
+                if (WindowFitsWithinSpace(screenPos, width, height))
+                {
+                    return ClampWindowToScreen(screenPos, screenWidth, screenHeight, width, height);
+                }
+            }
+        }
+
+        // Overlap
+        for (auto& w : g_window_list)
+        {
+            if (w->flags & WF_DEAD)
+                continue;
+            if (w->flags & WF_STICK_TO_BACK)
+                continue;
+
+            const ScreenCoordsXY offsets[] = {
+                { w->width + 2, 0 },
+                { -w->width - 2, 0 },
+                { 0, w->height + 2 },
+                { 0, -w->height - 2 },
+            };
+
+            for (const auto& offset : offsets)
+            {
+                auto screenPos = w->windowPos + offset;
+                if (WindowFitsOnScreen(screenPos, width, height))
+                {
+                    return ClampWindowToScreen(screenPos, screenWidth, screenHeight, width, height);
+                }
+            }
+        }
+
+        // Cascade
+        auto screenPos = ScreenCoordsXY{ 0, 30 };
+        for (auto& w : g_window_list)
+        {
+            if (screenPos == w->windowPos)
+            {
+                screenPos.x += 5;
+                screenPos.y += 5;
+            }
+        }
+
+        return ClampWindowToScreen(screenPos, screenWidth, screenHeight, width, height);
+    }
+
+    static ScreenCoordsXY GetCentrePositionForNewWindow(int32_t width, int32_t height)
+    {
+        auto uiContext = GetContext()->GetUiContext();
+        auto screenWidth = uiContext->GetWidth();
+        auto screenHeight = uiContext->GetHeight();
+        return ScreenCoordsXY{ (screenWidth - width) / 2, std::max(kTopToolbarHeight + 1, (screenHeight - height) / 2) };
+    }
+
+    WindowBase* Create(
+        std::unique_ptr<WindowBase>&& wp, WindowClass cls, ScreenCoordsXY pos, int32_t width, int32_t height,
+        uint32_t flags) override
+    {
+        if (flags & WF_AUTO_POSITION)
+        {
+            if (flags & WF_CENTRE_SCREEN)
+            {
+                pos = GetCentrePositionForNewWindow(width, height);
+            }
+            else
+            {
+                pos = GetAutoPositionForNewWindow(width, height);
+            }
+        }
+
+        // Check if there are any window slots left
+        // include kWindowLimitReserved for items such as the main viewport and toolbars to not appear to be counted.
+        if (g_window_list.size() >= static_cast<size_t>(Config::Get().general.WindowLimit + kWindowLimitReserved))
+        {
+            // Close least recently used window
+            for (auto& w : g_window_list)
+            {
+                if (w->flags & WF_DEAD)
+                    continue;
+                if (!(w->flags & (WF_STICK_TO_BACK | WF_STICK_TO_FRONT | WF_NO_AUTO_CLOSE)))
+                {
+                    Close(*w.get());
+                    break;
+                }
+            }
+        }
+
+        // Find right position to insert new window
+        auto itDestPos = g_window_list.end();
+        if (flags & WF_STICK_TO_BACK)
+        {
+            for (auto it = g_window_list.begin(); it != g_window_list.end(); it++)
+            {
+                if ((*it)->flags & WF_DEAD)
+                    continue;
+                if (!((*it)->flags & WF_STICK_TO_BACK))
+                {
+                    itDestPos = it;
+                }
+            }
+        }
+        else if (!(flags & WF_STICK_TO_FRONT))
+        {
+            for (auto it = g_window_list.rbegin(); it != g_window_list.rend(); it++)
+            {
+                if ((*it)->flags & WF_DEAD)
+                    continue;
+                if (!((*it)->flags & WF_STICK_TO_FRONT))
+                {
+                    itDestPos = it.base();
+                    break;
+                }
+            }
+        }
+
+        auto itNew = g_window_list.insert(itDestPos, std::move(wp));
+        auto w = itNew->get();
+
+        // Setup window
+        w->classification = cls;
+        w->flags = flags;
+
+        // Play sounds and flash the window
+        if (!(flags & (WF_STICK_TO_BACK | WF_STICK_TO_FRONT)))
+        {
+            w->flags |= WF_WHITE_BORDER_MASK;
+            OpenRCT2::Audio::Play(OpenRCT2::Audio::SoundId::WindowOpen, 0, pos.x + (width / 2));
+        }
+
+        w->windowPos = pos;
+        w->width = width;
+        w->height = height;
+        w->min_width = width;
+        w->max_width = width;
+        w->min_height = height;
+        w->max_height = height;
+
+        w->focus = std::nullopt;
+
+        ColourSchemeUpdate(w);
+        w->Invalidate();
+        w->OnOpen();
+        return w;
+    }
+
+    /**
+     * Closes the specified window.
+     *  rct2: 0x006ECD4C
+     *
+     * @param window The window to close (esi).
+     */
+    void Close(WindowBase& w) override
+    {
+        w.OnClose();
+
+        // Remove viewport
+        w.RemoveViewport();
+
+        // Invalidate the window (area)
+        w.Invalidate();
+
+        w.flags |= WF_DEAD;
+    }
+
+    void CloseSurplus(int32_t cap, WindowClass avoid_classification) override
+    {
+        // find the amount of windows that are currently open
+        auto count = static_cast<int32_t>(g_window_list.size());
+        // difference between amount open and cap = amount to close
+        auto diff = count - kWindowLimitReserved - cap;
+        for (auto i = 0; i < diff; i++)
+        {
+            // iterates through the list until it finds the newest window, or a window that can be closed
+            WindowBase* foundW{};
+            for (auto& w : g_window_list)
+            {
+                if (w->flags & WF_DEAD)
+                    continue;
+                if (!(w->flags & (WF_STICK_TO_BACK | WF_STICK_TO_FRONT | WF_NO_AUTO_CLOSE)))
+                {
+                    foundW = w.get();
+                    break;
+                }
+            }
+            // skip window if window matches specified WindowClass (as user may be modifying via options)
+            if (avoid_classification != WindowClass::Null && foundW != nullptr
+                && foundW->classification == avoid_classification)
+            {
+                continue;
+            }
+            Close(*foundW);
+        }
+    }
+
+    template<typename TPred>
+    void CloseByCondition(TPred pred, uint32_t flags = WindowCloseFlags::None)
+    {
+        for (auto it = g_window_list.rbegin(); it != g_window_list.rend(); ++it)
+        {
+            auto& wnd = *(*it);
+            if (wnd.flags & WF_DEAD)
+                continue;
+
+            if (pred(&wnd))
+            {
+                Close(wnd);
+                if (flags & WindowCloseFlags::CloseSingle)
+                {
+                    return;
+                }
+            }
+        }
+    }
+
+    /**
+     * Closes all windows with the specified window class.
+     *  rct2: 0x006ECCF4
+     * @param cls (cl) with bit 15 set
+     */
+    void CloseByClass(WindowClass cls) override
+    {
+        CloseByCondition([&](WindowBase* w) -> bool { return w->classification == cls; });
+    }
+
+    /**
+     * Closes all windows with specified window class and number.
+     *  rct2: 0x006ECCF4
+     * @param cls (cl) without bit 15 set
+     * @param number (dx)
+     */
+    void CloseByNumber(WindowClass cls, rct_windownumber number) override
+    {
+        CloseByCondition([cls, number](WindowBase* w) -> bool { return w->classification == cls && w->number == number; });
+    }
+
+    // TODO: Refactor this to use variant once the new window class is done.
+    void CloseByNumber(WindowClass cls, EntityId number) override
+    {
+        CloseByNumber(cls, static_cast<rct_windownumber>(number.ToUnderlying()));
+    }
+
+    /**
+     * Closes the top-most window
+     *
+     *  rct2: 0x006E403C
+     */
+    void CloseTop() override
+    {
+        CloseByClass(WindowClass::Dropdown);
+
+        if (gScreenFlags & SCREEN_FLAGS_SCENARIO_EDITOR)
+        {
+            if (GetGameState().EditorStep != EditorStep::LandscapeEditor)
+                return;
+        }
+
+        auto pred = [](WindowBase* w) -> bool { return !(w->flags & (WF_STICK_TO_BACK | WF_STICK_TO_FRONT)); };
+        CloseByCondition(pred, WindowCloseFlags::CloseSingle);
+    }
+
+    /**
+     * Closes all open windows
+     *
+     *  rct2: 0x006EE927
+     */
+    void CloseAll() override
+    {
+        CloseByClass(WindowClass::Dropdown);
+        CloseByCondition([](WindowBase* w) -> bool { return !(w->flags & (WF_STICK_TO_BACK | WF_STICK_TO_FRONT)); });
+    }
+
+    void CloseAllExceptClass(WindowClass cls) override
+    {
+        CloseByClass(WindowClass::Dropdown);
+        CloseByCondition([cls](WindowBase* w) -> bool {
+            return w->classification != cls && !(w->flags & (WF_STICK_TO_BACK | WF_STICK_TO_FRONT));
+        });
+    }
+
+    /**
+     * Closes all windows, save for those having any of the passed flags.
+     */
+    void CloseAllExceptFlags(uint16_t flags) override
+    {
+        CloseByCondition([flags](WindowBase* w) -> bool { return !(w->flags & flags); });
+    }
+
+    /**
+     * Closes all windows except the specified window number and class.
+     * @param number (dx)
+     * @param cls (cl) without bit 15 set
+     */
+    void CloseAllExceptNumberAndClass(rct_windownumber number, WindowClass cls) override
+    {
+        CloseByClass(WindowClass::Dropdown);
+        CloseByCondition([cls, number](WindowBase* w) -> bool {
+            return (!(w->number == number && w->classification == cls) && !(w->flags & (WF_STICK_TO_BACK | WF_STICK_TO_FRONT)));
+        });
+    }
+
+    /**
+     *
+     *  rct2: 0x006CBCC3
+     */
+    void CloseConstructionWindows() override
+    {
+        CloseByClass(WindowClass::RideConstruction);
+        CloseByClass(WindowClass::Footpath);
+        CloseByClass(WindowClass::TrackDesignList);
+        CloseByClass(WindowClass::TrackDesignPlace);
+    }
+
+    /**
+     * Finds the first window with the specified window class.
+     *  rct2: 0x006EA8A0
+     * @param WindowClass enum
+     * @returns the window or nullptr if no window was found.
+     */
+    WindowBase* FindByClass(WindowClass cls) override
+    {
+        for (auto& w : g_window_list)
+        {
+            if (w->flags & WF_DEAD)
+                continue;
+            if (w->classification == cls)
+            {
+                return w.get();
+            }
+        }
+        return nullptr;
+    }
+
+    /**
+     * Finds the first window with the specified window class and number.
+     *  rct2: 0x006EA8A0
+     * @param WindowClass enum
+     * @param window number
+     * @returns the window or nullptr if no window was found.
+     */
+    WindowBase* FindByNumber(WindowClass cls, rct_windownumber number) override
+    {
+        for (auto& w : g_window_list)
+        {
+            if (w->flags & WF_DEAD)
+                continue;
+            if (w->classification == cls && w->number == number)
+            {
+                return w.get();
+            }
+        }
+        return nullptr;
+    }
+
+    // TODO: Use variant for this once the window framework is done.
+    WindowBase* FindByNumber(WindowClass cls, EntityId id) override
+    {
+        return FindByNumber(cls, static_cast<rct_windownumber>(id.ToUnderlying()));
+    }
+
+    /**
+     *
+     *  rct2: 0x006EA845
+     */
+    WindowBase* FindFromPoint(const ScreenCoordsXY& screenCoords) override
+    {
+        for (auto it = g_window_list.rbegin(); it != g_window_list.rend(); it++)
+        {
+            auto& w = *it;
+            if (w->flags & WF_DEAD)
+                continue;
+
+            if (screenCoords.x < w->windowPos.x || screenCoords.x >= w->windowPos.x + w->width
+                || screenCoords.y < w->windowPos.y || screenCoords.y >= w->windowPos.y + w->height)
+                continue;
+
+            if (w->flags & WF_NO_BACKGROUND)
+            {
+                auto widgetIndex = FindWidgetFromPoint(*w.get(), screenCoords);
+                if (widgetIndex == kWidgetIndexNull)
+                    continue;
+            }
+
+            return w.get();
+        }
+
+        return nullptr;
+    }
+
+    /**
+     *
+     *  rct2: 0x006EA594
+     * x (ax)
+     * y (bx)
+     * returns widget_index if found, -1 otherwise
+     */
+    WidgetIndex FindWidgetFromPoint(WindowBase& w, const ScreenCoordsXY& screenCoords) override
+    {
+        // Invalidate the window
+        w.OnPrepareDraw();
+
+        // Find the widget at point x, y
+        WidgetIndex widget_index = kWidgetIndexNull;
+        for (auto i = 0u; i < w.widgets.size(); i++)
+        {
+            const auto& widget = w.widgets[i];
+
+            if (widget.type != WindowWidgetType::Empty && widget.IsVisible())
+            {
+                if (screenCoords.x >= w.windowPos.x + widget.left && screenCoords.x <= w.windowPos.x + widget.right
+                    && screenCoords.y >= w.windowPos.y + widget.top && screenCoords.y <= w.windowPos.y + widget.bottom)
+                {
+                    widget_index = i;
+                }
+            }
+        }
+
+        // Return next widget if a dropdown
+        if (widget_index != kWidgetIndexNull)
+        {
+            const auto& widget = w.widgets[widget_index];
+            if (widget.type == WindowWidgetType::DropdownMenu)
+                widget_index++;
+        }
+
+        // Return the widget index
+        return widget_index;
+    }
+
+    /**
+     *
+     *  rct2: 0x006ECDA4
+     */
+    WindowBase* BringToFront(WindowBase& w) override
+    {
+        if (!(w.flags & (WF_STICK_TO_BACK | WF_STICK_TO_FRONT)))
+        {
+            auto itSourcePos = WindowGetIterator(&w);
+            if (itSourcePos != g_window_list.end())
+            {
+                // Insert in front of the first non-stick-to-front window
+                auto itDestPos = g_window_list.begin();
+                for (auto it = g_window_list.rbegin(); it != g_window_list.rend(); it++)
+                {
+                    auto& w2 = *it;
+                    if (!(w2->flags & WF_STICK_TO_FRONT))
+                    {
+                        itDestPos = it.base();
+                        break;
+                    }
+                }
+
+                g_window_list.splice(itDestPos, g_window_list, itSourcePos);
+                w.Invalidate();
+
+                if (w.windowPos.x + w.width < 20)
+                {
+                    int32_t i = 20 - w.windowPos.x;
+                    w.windowPos.x += i;
+                    if (w.viewport != nullptr)
+                        w.viewport->pos.x += i;
+                    w.Invalidate();
+                }
+            }
+        }
+        return &w;
+    }
+
+    WindowBase* BringToFrontByClassWithFlags(WindowClass cls, uint16_t flags) override
+    {
+        WindowBase* w = FindByClass(cls);
+        if (w != nullptr)
+        {
+            w->flags |= flags;
+            w->Invalidate();
+            w = BringToFront(*w);
+        }
+
+        return w;
+    }
+
+    WindowBase* BringToFrontByClass(WindowClass cls) override
+    {
+        return BringToFrontByClassWithFlags(cls, WF_WHITE_BORDER_MASK);
+    }
+
+    /**
+     *
+     *  rct2: 0x006ED78A
+     * cls (cl)
+     * number (dx)
+     */
+    WindowBase* BringToFrontByNumber(WindowClass cls, rct_windownumber number) override
+    {
+        WindowBase* w = FindByNumber(cls, number);
+        if (w != nullptr)
+        {
+            w->flags |= WF_WHITE_BORDER_MASK;
+            w->Invalidate();
+            w = BringToFront(*w);
+        }
+
+        return w;
     }
 };
 

@@ -1,5 +1,5 @@
 /*****************************************************************************
- * Copyright (c) 2014-2023 OpenRCT2 developers
+ * Copyright (c) 2014-2025 OpenRCT2 developers
  *
  * For a complete list of all authors, please refer to contributors.md
  * Interested in contributing? Visit https://github.com/OpenRCT2/OpenRCT2
@@ -9,14 +9,15 @@
 
 #ifdef __ANDROID__
 
-#    include "Platform.h"
+    #include "Platform.h"
 
-#    include "../core/Guard.hpp"
-#    include "../localisation/Language.h"
+    #include "../Diagnostic.h"
+    #include "../core/Guard.hpp"
+    #include "../localisation/Language.h"
 
-#    include <SDL.h>
-#    include <jni.h>
-#    include <memory>
+    #include <SDL.h>
+    #include <jni.h>
+    #include <memory>
 
 AndroidClassLoader::~AndroidClassLoader()
 {
@@ -27,9 +28,11 @@ AndroidClassLoader::~AndroidClassLoader()
 jobject AndroidClassLoader::_classLoader;
 jmethodID AndroidClassLoader::_findClassMethod;
 
+// Initialized in JNI_OnLoad. Cannot be initialized here as JVM is not
+// available until after JNI_OnLoad is called.
 static std::shared_ptr<AndroidClassLoader> acl;
 
-namespace Platform
+namespace OpenRCT2::Platform
 {
     std::string GetFolderPath(SPECIAL_FOLDER folder)
     {
@@ -149,13 +152,23 @@ namespace Platform
         return {};
     }
 
-#    ifndef NO_TTF
+    u8string GetRCT1SteamDir()
+    {
+        return {};
+    }
+
+    u8string GetRCT2SteamDir()
+    {
+        return {};
+    }
+
+    #ifndef NO_TTF
     std::string GetFontPath(const TTFFontDescriptor& font)
     {
         STUB();
         return {};
     }
-#    endif
+    #endif
 
     float GetDefaultScale()
     {
@@ -173,18 +186,36 @@ namespace Platform
         return displayScale;
     }
 
-    void AndroidInitClassLoader()
-    {
-        acl = std::make_shared<AndroidClassLoader>();
-    }
-
     jclass AndroidFindClass(JNIEnv* env, std::string_view name)
     {
         return static_cast<jclass>(env->CallObjectMethod(
             AndroidClassLoader::_classLoader, AndroidClassLoader::_findClassMethod,
             env->NewStringUTF(std::string(name).c_str())));
     }
-} // namespace Platform
+
+    std::vector<std::string_view> GetSearchablePathsRCT1()
+    {
+        return { "/sdcard/rct1" };
+    }
+
+    std::vector<std::string_view> GetSearchablePathsRCT2()
+    {
+        return { "/sdcard/rct2" };
+    }
+} // namespace OpenRCT2::Platform
+
+JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM* pjvm, void* reserved)
+{
+    // Due to an issue where JNI_OnLoad could be called multiple times, we need
+    // to make sure it is only initialized once.
+    // https://issuetracker.google.com/issues/220523932
+    // Otherwise JVM complains about jobject-s having incorrect serial numbers.
+    if (!acl)
+    {
+        acl = std::make_shared<AndroidClassLoader>();
+    }
+    return JNI_VERSION_1_6;
+}
 
 AndroidClassLoader::AndroidClassLoader()
 {

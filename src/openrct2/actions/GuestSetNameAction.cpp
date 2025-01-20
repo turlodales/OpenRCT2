@@ -1,5 +1,5 @@
 /*****************************************************************************
- * Copyright (c) 2014-2023 OpenRCT2 developers
+ * Copyright (c) 2014-2025 OpenRCT2 developers
  *
  * For a complete list of all authors, please refer to contributors.md
  * Interested in contributing? Visit https://github.com/OpenRCT2/OpenRCT2
@@ -11,14 +11,16 @@
 
 #include "../Cheats.h"
 #include "../Context.h"
+#include "../Diagnostic.h"
 #include "../core/MemoryStream.h"
 #include "../drawing/Drawing.h"
 #include "../entity/EntityRegistry.h"
 #include "../interface/Window.h"
-#include "../localisation/Localisation.h"
 #include "../localisation/StringIds.h"
 #include "../windows/Intent.h"
 #include "../world/Park.h"
+
+using namespace OpenRCT2;
 
 GuestSetNameAction::GuestSetNameAction(EntityId spriteIndex, const std::string& name)
     : _spriteIndex(spriteIndex)
@@ -56,16 +58,16 @@ void GuestSetNameAction::Serialise(DataSerialiser& stream)
 
 GameActions::Result GuestSetNameAction::Query() const
 {
-    if (_spriteIndex.ToUnderlying() >= MAX_ENTITIES || _spriteIndex.IsNull())
+    if (_spriteIndex.ToUnderlying() >= kMaxEntities || _spriteIndex.IsNull())
     {
-        return GameActions::Result(GameActions::Status::InvalidParameters, STR_CANT_NAME_GUEST, STR_NONE);
+        return GameActions::Result(GameActions::Status::InvalidParameters, STR_CANT_NAME_GUEST, STR_ERR_VALUE_OUT_OF_RANGE);
     }
 
     auto guest = TryGetEntity<Guest>(_spriteIndex);
     if (guest == nullptr)
     {
-        LOG_WARNING("Invalid game command for sprite %u", _spriteIndex);
-        return GameActions::Result(GameActions::Status::InvalidParameters, STR_CANT_NAME_GUEST, STR_NONE);
+        LOG_ERROR("Guest entity not found for spriteIndex %u", _spriteIndex);
+        return GameActions::Result(GameActions::Status::InvalidParameters, STR_CANT_NAME_GUEST, kStringIdNone);
     }
 
     return GameActions::Result();
@@ -76,8 +78,8 @@ GameActions::Result GuestSetNameAction::Execute() const
     auto guest = TryGetEntity<Guest>(_spriteIndex);
     if (guest == nullptr)
     {
-        LOG_WARNING("Invalid game command for sprite %u", _spriteIndex);
-        return GameActions::Result(GameActions::Status::InvalidParameters, STR_CANT_NAME_GUEST, STR_NONE);
+        LOG_ERROR("Guest entity not found for spriteIndex %u", _spriteIndex);
+        return GameActions::Result(GameActions::Status::InvalidParameters, STR_CANT_NAME_GUEST, kStringIdNone);
     }
 
     auto curName = guest->GetName();
@@ -88,7 +90,7 @@ GameActions::Result GuestSetNameAction::Execute() const
 
     if (!guest->SetName(_name))
     {
-        return GameActions::Result(GameActions::Status::Unknown, STR_CANT_NAME_GUEST, STR_NONE);
+        return GameActions::Result(GameActions::Status::Unknown, STR_CANT_NAME_GUEST, kStringIdNone);
     }
 
     // Easter egg functions are for guests only
